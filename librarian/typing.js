@@ -1,0 +1,1 @@
+export const isNumeric = variable => !isNaN(variable)
