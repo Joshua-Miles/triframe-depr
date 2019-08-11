@@ -4,32 +4,34 @@ import { EventEmitter } from '../herald';
 import { map, filter } from '../mason';
 import { markersFor } from './Markers'
 import { SessionRequest } from './SessionRequest';
-const skippedPrototypes = [ Object.prototype, Function.prototype, EventEmitter.prototype ]
-const skippedProperties = [ 'prototype', 'constructor' ]
-const primativeTypes = [ 'String', 'Boolean', 'Number', 'Date', 'Function' ]
+const skippedPrototypes = [Object.prototype, Function.prototype, EventEmitter.prototype]
+const skippedProperties = ['prototype', 'constructor']
+const primativeTypes = ['String', 'Boolean', 'Number', 'Date', 'Function']
 
 export class Serializer {
-    
+
     agent = new EventEmitter
     dependencies = new Array
 
-    constructor(types){
-        this.interface = { 
-            types: map({ ...types, Collection }, (name, Type) => this.serializeType(Type, this.agent.of(name))), 
+    constructor(types) {
+        this.interface = {
+            types: map({ ...types, Collection }, (name, Type) => this.serializeType(Type, this.agent.of(name))),
             dependencies: this.dependencies
         }
     }
 
-    createSocketServer(io){
+    createSocketServer(io) {
         io.on('connection', socket => {
             socket.emit('interface', this.interface)
-            socket.on('message', ( { action, payload, id }) => this.agent.emit(action, { ...payload, socket, respond: (result) => {
-                socket.emit(id, result)
-            }}))
+            socket.on('message', ({ action, payload, id }) => this.agent.emit(action, {
+                ...payload, socket, respond: (result) => {
+                    socket.emit(id, result)
+                }
+            }))
         })
     }
 
-    serializeType(Type, agent){
+    serializeType(Type, agent) {
         this.CurrentType = Type
         const instance = new Type
         const name = Type.name
@@ -37,36 +39,38 @@ export class Serializer {
         const classProperties = this.serializeObject(`${name}.`, Type, agent.of('class'))
         this.currentPlacement = 'instance'
         const instanceProperties = this.serializeObject(`${name}#`, instance, agent.of('instance'))
-        return  {
+        return {
             name,
             classProperties,
             instanceProperties
         }
     }
-    
-    serializeObject(name, original, agent){
+
+    serializeObject(name, original, agent) {
         let props = {}, target = original
         do {
-            if(!skippedPrototypes.includes(target)){
+            if (!skippedPrototypes.includes(target)) {
                 props = {
                     ...props,
                     ...filter(map(
-                        filter( Object.getOwnPropertyDescriptors(target), key => !skippedProperties.includes(key) ),
+                        filter(Object.getOwnPropertyDescriptors(target), key => !skippedProperties.includes(key)),
                         (key, descriptor) => this.serializeProperty(`${name}${key}`, descriptor, agent.of(key))
                     ))
                 }
             }
         } while (target = Object.getPrototypeOf(target));
-        
+
         return props
     }
-    
-    serializeProperty(name, descriptor, agent){
+
+    serializeProperty(name, descriptor, agent) {
         let { markers, booleanMarkers } = this.markersFor(name)
 
-        if(markers.hidden) return
+        if (!markers.authorize && !markers.publish && !markers.shared && !name.endsWith('_')) {
+            return undefined
+        }
 
-        if(typeof descriptor.value == 'function'){
+        if (typeof descriptor.value == 'function') {
             return {
                 name,
                 type: 'method',
@@ -74,8 +78,8 @@ export class Serializer {
                 markers: booleanMarkers
             }
         }
-        
-        else if(typeof descriptor.get == 'function' || typeof descriptor.set == 'function'){
+
+        else if (typeof descriptor.get == 'function' || typeof descriptor.set == 'function') {
             return {
                 name,
                 type: 'property',
@@ -96,16 +100,16 @@ export class Serializer {
             }
         }
     }
-    
-    serializeFunction( func, markers, agent ){
+
+    serializeFunction(func, markers, agent) {
         const callCache = {}
-        let { pure, cache, session, authorize } = markers;
-        if(session && cache) throw Error('A function cannot be cached and access the session')
-        if(session && pure) throw Error('A function cannot be pure and access the session')
-        if(authorize && pure) throw Error('A function cannot be pure and authorized the session')
-        const usesSession = session;
-        if(pure){
-            let dependencies = pure
+        let { shared, session, authorize, publish, stream } = markers;
+        if (session && shared) throw Error('A function cannot be shared and access the session')
+        if (authorize && shared) throw Error('A function cannot be shared and require authorization')
+        if (authorize && publish) throw Error('A function cannot be publish and require authorization')
+        const cache = (!session && stream);
+        if (shared) {
+            let dependencies = shared
             let dependencyNames = Object.keys(dependencies)
             let dependencyValues = Object.values(map(dependencies, (key, value) => this.storeDependency(value)))
             return {
@@ -117,95 +121,121 @@ export class Serializer {
             const Type = this.CurrentType;
             const currentPlacement = this.currentPlacement;
             agent.on('call', async ({ socket, args, id, patches, includes, attributes, session, respond, emit }) => {
-                //await sleep(3000)
-                let hash;
-                if(authorize){
-                    let authorizer, message;
-                    if(typeof authorize === 'function') authorizer = authorize, message = 'You are not authorized for the requested action'
-                    else authorizer = authorize.unless, message = authorize.message
-                    if(!authorizer(session)) return respond({ error: true, message })
-                }
-                if(cache) { 
-                    hash = JSON.stringify({ args, id })
-                    if(callCache[hash]){
-                        let { pipe, serialized } = callCache[hash]
-                        respond(serialized)
-                        if(pipe.observe) pipe.observe( newDocument => {
-                            let newSerialized = this.serializeDocument(newDocument)
-                            let patch = jsonpatch.compare(serialized, newSerialized)
-                            serialized = newSerialized
-                            if(path.length) emit(patch)
-                        })
-                        return
-                    }
-                }
-                let target = currentPlacement == 'class' ? Type :  ( Number.isInteger(id) ? await Type.find(id, { includes }) : Type.new() )
-                try{
-                    jsonpatch.applyPatch(target, patches)
-                } catch(err){}
-                
-                if(attributes) Object.assign(target, attributes)
-                let pipe = func.apply(target, args)
-                if(!pipe || !pipe.then){
-                    respond(this.serializeDocument(pipe))
-                } else { 
-                    pipe.catch( err => {
-                        if(err instanceof SessionRequest){
-                            err.callback(session)
-                        }
-                    })
-                    pipe.then( document => {
-                        if(cache) callCache[hash] = { 
-                            get serialized(){
-                                return serialized
-                            },
-                            get pipe(){
-                                return pipe
-                            },
-                        }
 
-                        let serialized = this.serializeDocument(document)
-                        respond(serialized)
-                        if(pipe.observe) pipe.observe( newDocument => {
-                            let newSerialized = this.serializeDocument(newDocument)
+                // Create a unique identifier for this method call
+                let hash = JSON.stringify({ args, id })
+
+                // Create the object of the request
+                let createTarget = async() => {
+                    let target = currentPlacement == 'class' ? Type : (Number.isInteger(id) ? await Type.find(id, { includes }) : Type.new())
+                    try { jsonpatch.applyPatch(target, patches) } catch (err) { }
+                    if (attributes) Object.assign(target, attributes)
+                    return target
+                }
+
+                // Process a document and opened pipe for response
+                let sendResponse = ({document, pipe}) => {
+                    // Cache result if it has not been cached yet
+                    if(cache && !callCache[hash]) callCache[hash] = {
+                        get document() {
+                            return document
+                        },
+                        get pipe() {
+                            return pipe
+                        }
+                    }
+                    let serialized = this.serializeDocument(document, session)
+                    respond(serialized)
+                    
+                    // Emit updates to the requestor
+                    if (pipe && pipe.observe) {
+                        let emitUpdate = newDocument => {
+                            document = newDocument
+                            let newSerialized = this.serializeDocument(newDocument, session)
                             let patch = jsonpatch.compare(serialized, newSerialized)
                             serialized = newSerialized
                             emit(patch)
-                        })
-                    })
-
-                    socket.on('disconnect', () => {
-                        if(pipe.destroy){
-                            pipe.destroy()
                         }
-                    })
+                        pipe.observe(emitUpdate)
+
+                        // Unobserve the pipe.
+                        // Destroy the pipe if it is ambandoned
+                        socket.on('disconnect', () => {
+                            pipe.unobserve(emitUpdate)
+                            if (pipe.observers.length == 0) {
+                                pipe.destroy()
+                            }
+                        })
+                    }
                 }
+
+                // Check method authorization
+                if (authorize) {
+                    let authorizer, message;
+                    if (typeof authorize === 'function') authorizer = authorize, message = 'You are not authorized for the requested action'
+                    else authorizer = authorize.unless, message = authorize.message
+                    if (!authorizer(session)) return respond({ error: true, message })
+                }
+
+                // Check for a cached result
+                if (cache && callCache[hash]) return sendResponse(callCache[hash])
+
+                // Call the method
+                let pipe = func.apply(await createTarget(), args)
+                
+                // Send any non-pipe/promise response immediately
+                if (!pipe || !pipe.then) return sendResponse({ document: pipe, pipe: null })
+                    
+                // Catch any requests for the session. 
+                // This will always be reached for methods that can access the session
+                // As they cannot be cached
+                pipe.catch(err => {
+                    if (err instanceof SessionRequest) {
+                        err.callback(session)
+                    }
+                })
+
+                pipe.then(document => sendResponse({ document, pipe }))
+                
             })
         }
     }
 
-    serializeDocument(document, propertyName = false){
-        if(!document) return document
-        if(typeof document === 'function') return {
+    serializeDocument(document, session, propertyName = false) {
+        if (typeof document === 'function') return {
             __type__: document.name
         }
-        if(propertyName && markersFor(propertyName).hidden) return undefined;
-        if(primativeTypes.includes(document.constructor.name)) return document            
+        if (propertyName) {
+            let { authorize, publish } = markersFor(propertyName)
+            if (authorize && publish) throw Error('A field cannot be publish and require authorization')
+            if (authorize) {
+                let authorizer, message;
+                if (typeof authorize === 'function') authorizer = authorize, message = 'You are not authorized for the requested action'
+                else authorizer = authorize.unless, message = authorize.message
+                if (!authorizer(session)) return undefined
+            }
+            if (!authorize && !publish && !propertyName.startsWith('Collection') && !propertyName.startsWith('_')) {
+                return undefined
+            }
+        }
+        if (!document) return document
+
+        if (primativeTypes.includes(document.constructor.name)) return document
         return {
             __class__: document.constructor.name,
-            ...map(document, (propertyName, object) => this.serializeDocument(object, `${document.constructor.name}#${propertyName}`))
+            ...map(document, (propertyName, object) => this.serializeDocument(object, session, `${document.constructor.name}#${propertyName}`))
         }
     }
 
-    storeDependency(data){
-        let index = this.dependencies.findIndex( dependency => dependency == data )
-        if(index == -1) index= this.dependencies.push(data) - 1
+    storeDependency(data) {
+        let index = this.dependencies.findIndex(dependency => dependency == data)
+        if (index == -1) index = this.dependencies.push(data) - 1
         return index
     }
 
-    markersFor(name){
+    markersFor(name) {
         let markers = markersFor(name)
-        let booleanMarkers = map(markers, ( key, value ) => !!value )
+        let booleanMarkers = map(markers, (key, value) => !!value)
         return { markers, booleanMarkers }
     }
 

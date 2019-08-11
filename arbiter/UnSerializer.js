@@ -33,7 +33,6 @@ if(typeof window !== 'undefined') window.bin = bin
 
 let PENDING_VALUE = Symbol()
 let stringify = op => JSON.stringify(op)
-
 export class UnSerializer {
 
     patches = {}
@@ -41,7 +40,6 @@ export class UnSerializer {
     states= {}
 
     constructor({ dependencies, types }) {
-
         if(typeof window !== 'undefined') window.patches = this.patches
 
 
@@ -78,9 +76,15 @@ export class UnSerializer {
                 }
                 break;
             case 'property':
+                let getter = this.unSerializeFunction(name, value.get, markers, agent)
+                let setter = this.unSerializeFunction(name, value.set, markers, agent)
                 return {
-                    get: value.get && this.unSerializeFunction(name, value.get, markers, agent),
-                    set: value.set && this.unSerializeFunction(name, value.set, markers, agent)
+                    get:  value.get ? getter : function(){
+                        return getter.call(this)
+                    },
+                    set:  value.set ? setter : function(value){
+                        return setter.call(this, value)
+                    }
                 }
                 break;
             case 'attribute':
@@ -95,8 +99,9 @@ export class UnSerializer {
     unSerializeFunction(name, func, markers, agent) {
         const serializer = this
         const devtools = createDevTools(name)
-        const { pure, localyCache } = markers
-        if (pure) {
+        const { shared, stream } = markers
+        const cache = stream;
+        if (shared && func) {
             const { code, dependencyNames, dependencyValues } = func
             let dependencies = dependencyValues.map(index => this.dependencies[index])
             return new Function(...dependencyNames, `return (${code})`)(...dependencies)
@@ -105,15 +110,13 @@ export class UnSerializer {
             let bin = {}
             const method = function (...args) {
                 let openPipe = () => new Pipe([this, ambassador], ...args)
-                if (localyCache) {
+                if (cache) {
                     let hash = JSON.stringify(args)
                     if (!bin[hash]) {
-                        //if(name == 'Document.editorSession') console.log("---------------OPENING NEW PIPE----------------")
                         bin[hash] = openPipe()
                     } 
                     return bin[hash]
                 } else {
-                   // if(name == 'Document.editorSession') console.log("---------------OPENING NEW PIPE----------------")
                     return openPipe()
                 }
             }

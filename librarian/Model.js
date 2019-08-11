@@ -1,29 +1,27 @@
 import { toTableName, toCamelCase, toCapitalized, toUnderscored } from '../scribe'
-import { stream, EventEmitter, Pipe } from '../herald';
+import { EventEmitter, Pipe } from '../herald';
 import { each, index } from '../mason';
 import { drawQuery } from './sql';
 import { Database } from './database';
 import { datatypes } from './datatypes'
 import { Collection } from './Collection'
 import { createRelationshipDSL } from './createRelationshipDSL';
-import { pure, cache, authorize, session, hidden, localyCache } from '../arbiter'
+import { _shared, _public, _stream, _authorize, _session  } from '../arbiter'
 
 let database;
 
 export class Model {
 
-    @hidden
     fields = { 
         id: { name: 'id', type: 'SERIAL', constraints: { primaryKey: true } },
         last_updated: { name: 'last_updated', type: 'int8',  constraints: {} }
     }
 
-
     constructor(){
         Object.assign(this.fields, this.constructor.fields)
     }
 
-    @pure
+    @_shared
     get attributes(){
         const attributes = new Object
         Object.keys(this.fields).forEach( key => {
@@ -32,14 +30,14 @@ export class Model {
         return attributes
     }
 
-    @pure
+    @_shared
     set(attributes){
         const assign =  Object.assign.bind(Object)
         assign(this, attributes)
         if(this._onChange) this._onChange()
     }
 
-    @pure
+    @_shared
     update(attributes){
         this.set(attributes)
         this.save()
@@ -95,12 +93,11 @@ export class Model {
         return toTableName(this.name)
     }
 
-    @pure
     static get all(){
         return this.query({})
     }
 
-    @pure 
+    @_shared 
     static where(queryBuilder, options = {}){
         function createQueryOperator(name){
             return value => ({
@@ -118,7 +115,7 @@ export class Model {
     }
 
 
-    @stream 
+    @_stream 
     static *find(emit, id, { include } = {}){
         yield this.e.nowAndOn(`saved.${id}`)
         let query = (
@@ -139,7 +136,7 @@ export class Model {
         return result
     }
 
-    @stream 
+    @_stream 
     static *query(_, document, { include } = {}){
         let record = this.recordFrom(document)
         yield this.e.nowAndOn('saved.*')
@@ -154,7 +151,6 @@ export class Model {
             for(let i = 0; i < include.length; i++){ 
                 const Class = this._relations_.classes[include[i]]
                 yield Class.e.nowAndOn('saved.*')
-                console.log(include[i])
                 query = this.joinRelation(include[i], query)
             }
         }
@@ -162,7 +158,7 @@ export class Model {
         return result
     }
 
-    @pure
+    @_shared
     static new(attributes = {}){
         let instance = new this
         instance.set(attributes)
@@ -231,7 +227,7 @@ export class Model {
     // Datatype Decorators
 
     static get Decorators(){ 
-        return ({ ...datatypes, pure, cache, authorize, session, hidden, stream, localyCache })
+        return ({ ...datatypes, _shared, _public, _stream, _authorize, _session })
     }
 
 
@@ -253,7 +249,7 @@ export class Model {
     }
 
 
-    @stream
+    @_stream
     *loadRelation(emit, name){
         const Class = this.constructor._relations_.classes[name]
         yield Class.e.nowAndOn('saved.*')

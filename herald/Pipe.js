@@ -27,6 +27,10 @@ export class Pipe {
         this.observers.push(callback)
     }
 
+    unobserve(callback){
+        this.observers = this.observers.filter(observer => observer != callback)
+    }
+
     then(callback, errorHandler = null){
         if(errorHandler) this.catch(errorHandler)
         if(this.currentValue) callback(this.currentValue)

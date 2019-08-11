@@ -6,48 +6,69 @@ const root = {
 }
 
 const createOptionalArgumentDecorator = (decorator) => {
-    return arg => {
-        if(arg && arg.kind && arg.placement && arg.key){
-            return decorator(arg, null)
+    return (...args) => {
+        let arg = args[0]
+        if (arg && arg.kind && arg.placement && arg.key) {
+            return decorator(arg, [])
         } else {
-            return (decorated) => decorator(decorated, arg)
+            return (decorated) => decorator(decorated, args)
         }
     }
 }
 
-const createMarkerDecorator = name => createOptionalArgumentDecorator((decorated, payload)  => {
-    if(payload === null) payload = true
-    let placement = decorated.placement == 'static' ? '.' : '#'
-    
-    switch(decorated.kind){
-        case 'method':
-            let temp = Symbol()
-            decorated.extras = [
-                {
-                    kind: "field",
-                    placement: "own",
-                    key: temp,
-                    descriptor: {},
-                    initializer() { 
-                        delete this[temp]
-                        let propertyName = `${this.constructor.name}${placement}${decorated.key}`
-                        root.flags[propertyName] = root.flags[propertyName] || new Object 
-                        root.flags[propertyName][name] = payload
-                    }
-                  }
-            ]
-        break;
-        case 'field':
-            let original = decorated.initializer
-            decorated.initializer = function(){
-                let propertyName = `${placement == '.' ? this.name : this.constructor.name}${placement}${decorated.key}`
-                root.flags[propertyName] = root.flags[propertyName] || new Object 
-                root.flags[propertyName][name] = payload
-                return original()
+const createMarkerDecorator = name => createOptionalArgumentDecorator((decorated, methods) => {
+    if (decorated.kind == 'class') {
+        let temp = Symbol()
+        decorated.elements.push({
+            kind: "field",
+            key: temp,
+            placement: "own",
+            descriptor: {},
+            initializer() {
+                delete this[temp] 
+                methods.forEach(method => {
+                    let placement = method.startsWith('#') ? '' : '.'
+                    let propertyName = `${this.constructor.name}${placement}${method}`
+                    root.flags[propertyName] = root.flags[propertyName] || new Object
+                    root.flags[propertyName][name] = true
+                })
             }
-        break
+        })
+        
+        return decorated
+    } else {
+        let placement = decorated.placement == 'static' ? '.' : '#'
+
+        switch (decorated.kind) {
+            case 'method':
+                let temp = Symbol()
+                decorated.extras = [
+                    {
+                        kind: "field",
+                        placement: "own",
+                        key: temp,
+                        descriptor: {},
+                        initializer() {
+                            delete this[temp]
+                            let propertyName = `${this.constructor.name}${placement}${decorated.key}`
+                            root.flags[propertyName] = root.flags[propertyName] || new Object
+                            root.flags[propertyName][name] = true
+                        }
+                    }
+                ]
+                break;
+            case 'field':
+                let original = decorated.initializer
+                decorated.initializer = function () {
+                    let propertyName = `${placement == '.' ? this.name : this.constructor.name}${placement}${decorated.key}`
+                    root.flags[propertyName] = root.flags[propertyName] || new Object
+                    root.flags[propertyName][name] = true
+                    return original.call(this)
+                }
+                break
+        }
+        return decorated
     }
-    return decorated
 })
 
 const markersFor = name => {
@@ -58,19 +79,20 @@ const clearMarkers = () => {
     delete root.flags
 }
 
-const  pure = createMarkerDecorator('pure')
-const  markSession = createMarkerDecorator('session')
-const  cache = createMarkerDecorator('cache')
-const  authorize = createMarkerDecorator('authorize')
-const  hidden = createMarkerDecorator('hidden')
-const  localyCache = createMarkerDecorator('localyCache')
+const _shared = createMarkerDecorator('shared')
+const _authorize = createMarkerDecorator('authorize')
+const _public = createMarkerDecorator('publish')
 
-const session = (property) => {
+const markSession = createMarkerDecorator('session')
+const markStream = createMarkerDecorator('stream')
+
+
+const _session = (property) => {
     let original = property.descriptor.value
     markSession(property)
-    property.descriptor.value = function(...args){
+    property.descriptor.value = function (...args) {
         let model = this;
-        return new Pipe( emit => {
+        return new Pipe(emit => {
             throw new SessionRequest(session => {
                 let result = new Pipe([model, original], session, ...args)
                 result.observe(emit)
@@ -81,14 +103,29 @@ const session = (property) => {
     return property
 }
 
+const _stream = function (property) {
+    let value
+    markStream(property)
+    if (typeof property == 'function') {
+        value = function (...args) {
+            return new Pipe([this, property], ...args)
+        }
+    } else {
+        let original = property.descriptor.value
+        property.descriptor.value = function (...args) {
+            return new Pipe([this, original], ...args)
+        }
+    }
+    return value
+}
+
 export {
-    pure,
-    session,
-    cache,
-    localyCache,
-    authorize,
-    hidden,
-    
+    _shared,
+    _stream,
+    _session,
+    _authorize,
+    _public,
+
     markersFor,
     clearMarkers,
     root

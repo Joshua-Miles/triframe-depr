@@ -1,4 +1,4 @@
-import { pure } from "../arbiter";
+import { _shared } from "../arbiter";
 
 export class Collection {
 
@@ -7,37 +7,37 @@ export class Collection {
         this.__presets__ = presets
     }
 
-    @pure
+    @_shared
     toArray(){
         return this.indexes.map( index => this[index])
     }
 
-    @pure
+    @_shared
     static fromArray(array){
         let collection = new this
         array.forEach( element => collection.push(element))
         return collection
     }
 
-    @pure
+    @_shared
     get first(){
         let index = this.indexes[0]
         return this[index] === undefined ? null : this[index] 
     }
 
 
-    @pure
+    @_shared
     get last(){
         let index = this.indexes[this.indexes.length-1]
         return this[index]
     }
 
-    @pure 
+    @_shared 
     get indexes(){
         return Object.keys(this).filter( key => ( !isNaN(key) || key.startsWith('new')) && !this[key]['__isDeleted__']  ).sort()
     }
 
-    @pure
+    @_shared
     get nextID(){
         let i = 1
         let id;
@@ -48,12 +48,12 @@ export class Collection {
         return id
     }
 
-    @pure
+    @_shared
     push(element){
         return this[element.id] = element
     }
 
-    @pure
+    @_shared
     new(attributes = {}){
         let assign = Object.assign.bind(Object)
         assign(attributes, this.__presets__)
@@ -64,7 +64,7 @@ export class Collection {
     }
 
 
-    @pure
+    @_shared
     create(attributes = {}){
         let assign = Object.assign.bind(Object)
         assign(attributes, this.__presets__)
@@ -83,31 +83,31 @@ export class Collection {
     }
 
 
-    @pure 
+    @_shared 
     remove(element){
         delete this[element.id]
         this._onChange()
         element.destroy()
     }
 
-    @pure
+    @_shared
     map(callback){
         let array = this.indexes.map( key => this[key])
         let newArray = array.map(callback)
         return newArray
     }
 
-    @pure
+    @_shared
     reduce(callback, initial){
         return this.toArray().reduce(callback, initial)
     }
 
-    @pure
+    @_shared
     sort(callback){
         return this.toArray().sort(callback)
     }
 
-    @pure
+    @_shared
     find(callback){
         let array = this.indexes.map( key => this[key])
         let newArray = array.find(callback)
@@ -115,21 +115,21 @@ export class Collection {
     }
 
 
-    @pure
+    @_shared
     some(callback){
         let array = this.indexes.map( key => this[key])
         let result = array.some(callback)
         return result
     }
 
-    @pure
+    @_shared
     filter(callback){
         let array = this.indexes.map( key => this[key])
         let newArray = array.filter(callback)
         return newArray
     }
 
-    @pure
+    @_shared
     mapCollection(callback){
         let array = this.indexes.map( key => this[key])
         let newArray = array.map(callback)
@@ -137,12 +137,12 @@ export class Collection {
     }
 
    
-    @pure
+    @_shared
     forEach(callback){
         this.indexes.forEach( i => callback(this[i]))
     }
 
-    @pure
+    @_shared
     each(callback){
         for(let i in this){
             if(i.startsWith('_')) continue
@@ -150,7 +150,7 @@ export class Collection {
         }
     }
 
-    @pure
+    @_shared
     indexedBy(index =  '_id', select = false, coalesceValue = undefined){
         let subject = this
         let returnValue = new Object;
@@ -167,7 +167,7 @@ export class Collection {
     }
 
 
-    @pure
+    @_shared
     get length(){
         return this.indexes.length
     }

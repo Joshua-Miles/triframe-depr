@@ -87,8 +87,8 @@ const createFieldDecorator = (alias, { type, hasModifier, createField = defaultF
 
 const defaultFieldCreator = function(property, type, typeModifier, constraints = {}){
     const name = toColumnName(property.key)
-    const defaults = property.initializer()
     const initializer = function(){
+        const defaults = property.initializer.call(this)
         this.fields[name] = ({ name, type, typeModifier, defaults, constraints })
         return defaults
     }
