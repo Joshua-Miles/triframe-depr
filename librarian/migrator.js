@@ -1,7 +1,247 @@
-import { each, eachAsync, index, map, unique } from '../mason'
-import { createTable, dropTable, addColumn, dropColumn, setType, setColumnDefault, dropColumnDefault, setNotNull, dropNotNull, addUniqueConstraint, dropUniqueConstraint, addPrimaryKeyConstraint, dropPrimaryKeyConstraint, addReference, dropReference } from './sql';
+import { group, index, map, unique, filter } from '../mason'
+import { isNumeric } from './typing'
 
-export const generatePatch = ( schema = new Object, types = new Object ) => {
+export const migrate = async (database, types) => {
+    const patch = generatePatch(await formatSchema(await database.query(selectSchema())), types)
+    if (patch) {
+        console.log('Patching:', patch)
+        await database.query(patch)
+    }
+}
+
+const createTable = (name, fields = new Array) => (
+    `CREATE TABLE ${name} (${Object.values(map(fields, defineColumn)).join(', ')});`
+)
+
+const dropTable = (name) => (
+    `DROP TABLE ${name}`
+)
+
+const addColumn = (name, column) => (
+    `ADD COLUMN ${defineColumn(name, column)}`
+)
+
+const dropColumn = (name) => (
+    `DROP COLUMN "${name}"`
+)
+
+const alterColumn = (name, operations) => (
+    `ALTER COLUMN "${name}" ${operations.join(', ')}`
+)
+
+const defineColumn = (name, { type, typeModifier, defaults, constraints }) => {
+    let definition = `"${name}" ${type}`
+    if(typeModifier) definition = `${definition}(${typeModifier})`
+    if(typeof defaults == 'number' || typeof defaults == 'boolean' ||  defaults == null) definition = `${definition} DEFAULT ${defaults}`
+    else if (defaults !== undefined) definition = `${definition} DEFAULT '${defaults}'`
+    if(constraints) definition = `${definition} ${defineConstraints(constraints)}`
+    return definition
+}
+
+const defineConstraints = function({ unique, notNull, primaryKey, references }){
+    let definition = ''
+    if(unique) definition = `${definition} UNIQUE `
+    if(notNull) definition = `${definition} NOT NULL `
+    if(primaryKey) definition = `${definition} PRIMARY KEY `
+    if(references){
+        let { table, onDelete } = references
+        definition = `${definition} REFERENCES ${table}(id) ON DELETE ${mapDeleteAction.fromJS.toSQL[onDelete] || 'SET NULL'}`
+    }
+    return definition
+}
+
+const setType = (name, type) => (
+    `ALTER COLUMN "${name}" TYPE ${type}`
+)
+
+const setNotNull = (name) => (
+    `ALTER COLUMN "${name}" SET NOT NULL`
+)
+
+const dropNotNull = (name) => (
+    `ALTER COLUMN "${name}" DROP NOT NULL`
+)
+
+const setColumnDefault = (name, defaults) => (
+    `ALTER COLUMN "${name}" SET DEFAULT ${isNumeric(defaults) ? defaults : `'${defaults}'`}`
+)
+
+const dropColumnDefault = (name) => (
+    `ALTER COLUMN "${name}" DROP DEFAULT`
+)
+
+const addUniqueConstraint = (name) => (
+    `ADD CONSTRAINT ${name}_unique UNIQUE(${name})`
+)
+
+const dropUniqueConstraint = (name) => (
+   `DROP CONSTRAINT ${name}_unique`
+)
+
+
+const addPrimaryKeyConstraint = (name) => (
+    `ADD CONSTRAINT ${name}_pk PRIMARY KEY(${name})`
+)
+
+const dropPrimaryKeyConstraint = (name) => (
+    `DROP CONSTRAINT ${name}_pk`
+ )
+ 
+
+const addReference = (name, { table, onDelete }) => (
+    `ADD CONSTRAINT ${name}_fkey FOREIGN KEY(${name}) REFERENCES ${table}(id) ON DELETE ${mapDeleteAction.fromJS.toSQL[onDelete] || 'SET NULL'}`
+)
+
+const dropReference =  (name) => (
+    `DROP CONSTRAINT ${name}_fkey`
+)
+
+const decodeAdsrc = function(text){
+    if(!text) return text
+    let [ value ] = text.split('::')
+    return value.replace(/'/g, '')
+}
+
+const selectSchema = () => (`
+    SELECT 
+        tab.relname as table_name,
+        attr.attname as name,
+        ty.typname as type,
+        attr.atttypmod as type_modifier,
+        con.contype as constraint_type,
+        ref_table.relname as reference_table,
+        con.confdeltype as on_delete,
+        con.confupdtype as on_update,
+        attr.attnotnull as not_null,
+        de.adsrc as defaults
+    FROM
+        pg_class as tab
+        JOIN pg_catalog.pg_namespace as n 
+            ON n.oid = tab.relnamespace
+        LEFT JOIN pg_attribute as attr
+            ON tab.oid = attr.attrelid
+        LEFT JOIN pg_type as ty
+            ON attr.atttypid = ty.oid
+        LEFT JOIN pg_attrdef as de
+            ON  
+                tab.oid = de.adrelid
+            AND
+                attr.attnum = de.adnum
+        LEFT JOIN pg_constraint as con 
+            ON 
+                attr.attrelid = con.conrelid
+            AND
+                attr.attnum = ANY(con.conkey)
+        LEFT JOIN pg_class as ref_table ON con.confrelid = ref_table.oid
+    WHERE 
+        tab.relkind = 'r'
+            AND
+        n.nspname = 'public'
+            AND
+        attr.attnum >= 0
+            AND
+        ty.typname IS NOT NULL
+`)
+
+const formatSchema = (schema) => (
+    map( group(schema.rows, 'table_name'), ( tableName, table ) => (
+        map( group(table, 'name'), ( columnName, constraints ) => ({ 
+            tableName: constraints[0].table_name,
+            name: constraints[0].name,
+            type: constraints[0].type,
+            typeModifier: constraints[0].type_modifier,
+            defaults: decodeAdsrc(constraints[0].defaults),
+            constraints: {  notNull: constraints[0].not_null, ...map(index(constraints, byConstraintType), toFormattedConstraint) }
+        }))
+    ))
+)
+
+
+const byConstraintType = (key, { constraint_type }) => (
+    mapConstraintType.fromEnum.toJS[constraint_type] ? mapConstraintType.fromEnum.toJS[constraint_type] : 'details'
+)
+
+const toFormattedConstraint = (type, {reference_table, on_delete, on_update}) =>{
+    if(type == 'references') {
+        return {
+            onDelete: mapDeleteAction.fromEnum.toJS[on_delete],
+            // onUpdate: on_update,
+            table: reference_table
+        }
+    } else {
+        return true
+    }
+}
+
+const deleteActionMap = [
+    {
+        enum: 'r',
+        sql: 'RESTRICT',
+        js: 'restrict'
+    },
+    {
+        enum: 'a',
+        sql: 'NO ACTION',
+        js: 'noAction'
+    },
+    {
+        enum: 'd',
+        sql: 'SET DEFAULT',
+        js: 'setDefault'
+    },
+    {
+        enum: 'c',
+        sql: 'CASCADE',
+        js: 'cascade'
+    },
+    {
+        enum: 'n',
+        sql: 'SET NULL',
+        js: 'setNull'
+    }
+]
+
+
+const mapDeleteAction = {
+    fromEnum: {
+        toJS: index(deleteActionMap, 'enum', 'js'),
+        toSQL: index(deleteActionMap, 'enum', 'sql')
+    },
+    fromJS: {
+        toEnum: index(deleteActionMap, 'js', 'enum'),
+        toSQL: index(deleteActionMap, 'js', 'sql')
+    },
+    fromSQL: {
+        toJS: index(deleteActionMap, 'sql', 'js'),
+        toEnum: index(deleteActionMap, 'sql', 'enum')
+    }
+}
+
+const constraintTypeMap = [
+    {
+        enum: 'p',
+        js: 'primaryKey'
+    },
+    {
+        enum: 'f',
+        js: 'references'
+    },
+    {
+        enum: 'u',
+        js: 'unique'
+    }
+]
+  
+const mapConstraintType = {
+    fromJS:{
+        toEnum: index(constraintTypeMap, 'js', 'enum'),
+    },
+    fromEnum: {
+        toJS: index(constraintTypeMap, 'enum', 'js')
+    }
+}
+
+const generatePatch = ( schema = new Object, types = new Object ) => {
     types = index(types, 'tableName')
     let tableNames = unique([ ...Object.keys(schema), ...Object.keys(types) ])
     let sql = tableNames.map( tableName => (
@@ -13,6 +253,7 @@ export const generatePatch = ( schema = new Object, types = new Object ) => {
 const patchTable = ( schema, types, tableName ) => {
     let Type = types[tableName]
     let type = Type ? new Type : null
+    if(type) type.fields = filter(type.fields, ( key, value ) => value.type !== 'virtual')
     let { added, removed } = comparisonOf(schema, types)
     if(added(tableName))  return createTable(tableName, type.fields) 
     if(removed(tableName)) return dropTable(tableName)

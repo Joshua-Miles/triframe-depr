@@ -1,5 +1,4 @@
-import { generatePatch } from './migrator'
-import { formatSchema, selectSchema } from './sql'
+import { generatePatch, formatSchema, selectSchema } from './migrator'
 const Client = require('pg').Client
 
 const schema = Symbol()

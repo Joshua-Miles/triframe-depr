@@ -3,12 +3,13 @@ const { Pipe } = require ('./Pipe')
 
 const bin = Symbol()
 const nodes = Symbol()
-
+let id = 0
 export class EventEmitter {
 
+    submodules = {}
 
     constructor(){
-       
+       this.id = id++
         Object.defineProperty(this, nodes, {
             value: {},
             enumerable: false,
@@ -93,7 +94,9 @@ export class EventEmitter {
     }
 
     of(namespace){
-        let newEmitter = new EventEmitter 
+        console.log(this.submodules)
+        if(this.submodules[namespace]) return this.submodules[namespace]
+        let newEmitter = this.submodules[namespace] = new EventEmitter 
         const proxyMarker = Symbol()
         this.on(`${namespace}.*`, (payload, event, metadata) => {
             if(metadata[proxyMarker]) return 

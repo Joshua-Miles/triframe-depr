@@ -65,8 +65,7 @@ export class Serializer {
 
     serializeProperty(name, descriptor, agent) {
         let { markers, booleanMarkers } = this.markersFor(name)
-
-        if (!markers.authorize && !markers.publish && !markers.shared && !name.endsWith('_')) {
+        if (!markers.authorize && !markers.publish && !markers.shared) {
             return undefined
         }
 
@@ -188,7 +187,7 @@ export class Serializer {
                     
                 // Catch any requests for the session. 
                 // This will always be reached for methods that can access the session
-                // As they cannot be cached
+                // as they cannot be cached
                 pipe.catch(err => {
                     if (err instanceof SessionRequest) {
                         err.callback(session)
@@ -222,8 +221,8 @@ export class Serializer {
 
         if (primativeTypes.includes(document.constructor.name)) return document
         return {
+            ...map(document, (propertyName, object) => this.serializeDocument(object, session, `${document.constructor.name}#${propertyName}`)),
             __class__: document.constructor.name,
-            ...map(document, (propertyName, object) => this.serializeDocument(object, session, `${document.constructor.name}#${propertyName}`))
         }
     }
 

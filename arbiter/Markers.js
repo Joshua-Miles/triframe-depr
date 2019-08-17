@@ -112,12 +112,15 @@ const _stream = function (property) {
         }
     } else {
         let original = property.descriptor.value
+        let newFunc = function(_, ...args){
+            return original.apply(this, args)
+        }
         property.descriptor.value = function (...args) {
-            return new Pipe([this, original], ...args)
+            return new Pipe([this, newFunc], ...args)
         }
     }
     return value
-}
+} 
 
 export {
     _shared,

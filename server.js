@@ -10,9 +10,13 @@ if (!fs.existsSync(SESSIONS_PATH)){
 
 export default class Server {
 
-    constructor(types, { drawRelationships, user, password, database, port } = {}){
-        if(drawRelationships) drawRelationships.call(types, Model.createRelationshipDSL())
-        Model.connect({ user, password, database, port }, types)
+    constructor(...args){
+        this.boot(...args)
+    }
+
+    async boot(types, { user, password, database, port } = {}){
+        await Model.connect({ user, password, database, port })
+        await Model.migrate(types)
         this.io = socketIo(80);
         const serializer = this.serializer = new Serializer(types)
         const unserializer = this.unserializer = new UnSerializer(serializer.interface)

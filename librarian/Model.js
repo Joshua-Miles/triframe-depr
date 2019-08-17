@@ -1,291 +1,175 @@
-import { toTableName, toCamelCase, toCapitalized, toUnderscored } from '../scribe'
-import { EventEmitter, Pipe } from '../herald';
-import { each, index } from '../mason';
-import { drawQuery } from './sql';
-import { Database } from './database';
-import { datatypes } from './datatypes'
-import { Collection } from './Collection'
-import { createRelationshipDSL } from './createRelationshipDSL';
+import { DBConnection } from './DBConnection'
 import { _shared, _public, _stream, _authorize, _session  } from '../arbiter'
+import { datatypes } from './datatypes'
+import { toTableName, toCamelCase } from '../scribe'
+import { map, filter } from '../mason';
+import { EventEmitter } from '../herald';
 
-let database;
+const global = new EventEmitter
 
-export class Model {
+export class Model extends DBConnection {
 
-    fields = { 
-        id: { name: 'id', type: 'SERIAL', constraints: { primaryKey: true } },
-        last_updated: { name: 'last_updated', type: 'int8',  constraints: {} }
-    }
-
-    constructor(){
-        Object.assign(this.fields, this.constructor.fields)
-    }
-
-    @_shared
-    get attributes(){
-        const attributes = new Object
-        Object.keys(this.fields).forEach( key => {
-            attributes[key] = this[key]
-        })
-        return attributes
-    }
-
-    @_shared
-    set(attributes){
-        const assign =  Object.assign.bind(Object)
-        assign(this, attributes)
-        if(this._onChange) this._onChange()
-    }
-
-    @_shared
-    update(attributes){
-        this.set(attributes)
-        this.save()
-    }
-
-    async save(){
-        let record = this.toRecord()
-        delete record.id
-        let attributes = Number.isFinite(this.id) ? 
-            await (
-                drawQuery(database)
-                    .selectFirst()
-                    .update(this.constructor.tableName)
-                    .set(record)
-                    .where({ id: this.id })
-            )
-                :
-            await (
-                drawQuery(database)
-                    .selectFirst()
-                    .insert(this.constructor.tableName)
-                    .set(record)
-            )
-        const instance = this.constructor.documentFrom(attributes)
-        this.constructor.e.emit(`saved.*`)
-        return instance
-    }
-
-    async destroy(){
-        let result =  await (
-            drawQuery(database)
-                .delete(this.constructor.tableName)
-                .where({ id: this.id })
-        )
-        this.constructor.e.emit(`saved.*`)
-        return result
-    }
-
-
-    toRecord(){
-        return this.constructor.recordFrom(this)
-    }
-
-
-    // Class Methods
-
-    static get e() {
-        if(this._e) return this._e
-        return this._e = new EventEmitter
-    }
+    // ------------------------- CLASS METHODS ----------------------------------
 
     static get tableName(){
         return toTableName(this.name)
     }
 
     static get all(){
-        return this.query({})
+        return this.query( ({ sql, self }) => (sql`
+            SELECT ${self('*')} FROM ${self};
+        `))
     }
 
-    @_shared 
-    static where(queryBuilder, options = {}){
-        function createQueryOperator(name){
-            return value => ({
-                is: name,
-                value
-            })
-        }
-        return this.query(queryBuilder({
-            includes: createQueryOperator('includes'),
-            startsWith: createQueryOperator('startsWith'),
-            endsWith: createQueryOperator('endsWith'),
-            greaterThan: createQueryOperator('greaterThan'),
-            lessThan: createQueryOperator('lessThan')
-        }), options)
+    @_stream
+    static  * find(id){
+        yield this.nowAndOn(`${id}`)
+        let results = yield this.query( ({ sql, self }) => (sql`
+            SELECT ${self('*')} FROM ${self}
+            WHERE id=${id}
+        `))
+        return results.first
     }
 
-
-    @_stream 
-    static *find(emit, id, { include } = {}){
-        yield this.e.nowAndOn(`saved.${id}`)
-        let query = (
-            drawQuery(database)
-                .select()
-                .from(this.tableName)
-                .where({ id })
-                .process(records => records.mapCollection(record => this.documentFrom(record)))
-        )
-        if(include){
-            for(let i = 0; i < include.length; i++){ 
-                const Class = this._relations_.classes[include[i]]
-                yield Class.e.nowAndOn('saved.*')
-                query = this.joinRelation(include[i], query)
-            }
-        }
-        let result =  (yield query).first
-        return result
+    @_stream
+    static *where(attributes){
+        yield this.nowAndOn('*')
+        return this.query( ({ sql, self, each }) => sql`
+            SELECT ${self('*')} FROM ${self}
+            WHERE ${each(attributes, (key, value) => 
+                `${key}=${value}`, 'AND'
+            )}
+        `)
     }
 
-    @_stream 
-    static *query(_, document, { include } = {}){
-        let record = this.recordFrom(document)
-        yield this.e.nowAndOn('saved.*')
-        let query = (
-            drawQuery(database)
-                .select()
-                .from(this.tableName)
-                .where(record)
-                .process(records => records.mapCollection( record => this.documentFrom(record)))
-        )
-        if(include){
-            for(let i = 0; i < include.length; i++){ 
-                const Class = this._relations_.classes[include[i]]
-                yield Class.e.nowAndOn('saved.*')
-                query = this.joinRelation(include[i], query)
-            }
-        }
-        let result = yield query
-        return result
-    }
-
-    @_shared
-    static new(attributes = {}){
-        let instance = new this
-        instance.set(attributes)
-        return instance
-    }
-
-    static create(attributes = {}){
-        let instance = new this
-        instance.set(attributes)
-        let promise = instance.save()
-        return promise
-    }
-
-    static recordFrom(document){
-        let instance = new this
-        let record = new Object
-        each(instance.fields, sqlName => {
-            let jsName = toCamelCase(sqlName)
-            let value = document[jsName]
-            if(value !== undefined) record[sqlName] = value
-        })
-        return record
-    }
-
-    static documentFrom(record){
-        return record.mapCollection ? record.mapCollection( record => this.documentFrom(record)) : this.new( index( record, toCamelCase ))
-    }
-
-    static async destroy(document){
-        let record = this.recordFrom(document)
-        let result =  await (
-            drawQuery(database)
-                .delete(this.constructor.tableName)
-                .where(record)
-        )
-        await this.constructor.emitSave(this)
-        return result
+    @_stream
+    static *search(attributes){
+        yield this.nowAndOn('*')
+        return this.query( ({ sql, self, each }) => sql`
+            SELECT ${self('*')} FROM ${self}
+            WHERE ${each(attributes, (key, value) => 
+                `${key} LIKE ${value}`, 'OR'
+            )}
+        `)
     }
 
     static async destroyAll(){
-        let result =  await (
-            drawQuery(database)
-                .delete(this.tableName)
-        )
-        await this.e.emit(`saved.*`)
+        let result = await this.query( ({ sql, self }) => (sql`
+            DELETE FROM ${self};
+        `))
+        this.emit('*')
+        return result
+    }
+
+    static async create(attributes){
+        let result = await this.query( ({ sql, self, keysOf, valuesOf }) => (sql`
+            INSERT INTO ${self} (${keysOf(attributes)}) VALUES (${valuesOf(attributes)})
+            RETURNING id
+        `))
+        this.emit('*')
+        return result
+    }
+
+    // ----------------------- INSTANCE METHODS ----------------------------------
+
+    @_shared
+    set(attributes){
+        Object.assign(this, attributes)
+        this._onChange()
+    }
+
+
+    @_shared
+    save(){
+        this._onChange()
+        return this.commit()
+    }
+
+    update(attributes){
+        Object.assign(attributes)
+        return this.commit()
+    }
+
+    async commit(){
+        const { attributes } = this;
+        delete attributes.id
+        let result = await this.query( ({ sql, self, each }) => sql`
+            UPDATE ${self} 
+            SET ${each(attributes, (key, value) => 
+                `${key}=${value}`
+            )}
+            WHERE id=${this.id}
+        `)
+        this.emit(`${this.id}`)
+        return result
+    }
+
+    async destroy(){
+        let result = await this.query( ({ sql, self }) => sql`
+            DELETE FROM ${self}
+            WHERE id=${this.id}
+        `)
+        this.emit(`${this.id}`)
         return result
     }
 
 
-    // Connection Utils
+    // --------------------------------EVENT ENGINE -------------------------------
 
-    static connect(options, types){
-        database = new Database(options)
-        return database.patchSchema(types)
+    static global = global
+
+    static get events(){
+        return global.of(this.name)
     }
 
-    static createRelationshipDSL(){
-        return createRelationshipDSL({
-            get database(){
-                return database
-            }
-        })
-    }
-   
-
-    // Datatype Decorators
-
-    static get Decorators(){ 
-        return ({ ...datatypes, _shared, _public, _stream, _authorize, _session })
+    static on(...args){
+        return this.events.on(...args)
     }
 
-
-    // Relationships 
-
-    static _relations_ = {
-        default: true,
-        load: new Object,
-        set: new Object,
-        join: new Object,
-        classes: new Object,
-        foreignKeys: new Object,
-        localKeys: new Object,
-        names: new Array
+    static emit(...args){
+        return this.events.emit(...args)
     }
 
-    _relations_ = {
-        cache: new Object
+    static nowAndOn(...args){
+        return this.events.nowAndOn(...args)
+    }
+
+    global = global
+
+    events = global.of(this.constructor.name)
+
+    on(...args){
+        return this.events.on(...args)
+    }
+
+    emit(...args){
+        return this.events.emit(...args)
+    }
+
+    nowAndOn(...args){
+        return this.events.nowAndOn(...args)
     }
 
 
-    @_stream
-    *loadRelation(emit, name){
-        const Class = this.constructor._relations_.classes[name]
-        yield Class.e.nowAndOn('saved.*')
-        return this.constructor._relations_.load[name].call(this)
-    }
 
-    setRelation(name, value){
-        return this.constructor._relations_.set[name](value)
-    }
-
-    static joinRelation(name, query){
-        let result = this._relations_.join[name](query)
-        const Class = this._relations_.classes[name]
-        let foreignKey;
-        if(this._relations_.foreignKeys[name]) foreignKey = toCamelCase(this._relations_.foreignKeys[name])
-        result.process( records => 
-            records.mapCollection( record => {
-                if(record[name] instanceof Collection){
-                    const collection = new Collection(Class, { [foreignKey]: record.id  })
-                    record[name].forEach( (record, i) => collection.push( Class.documentFrom(record)))
-                    record[name] = collection
-                } else {
-                    ///console.log(records)
-                   // record[name] =  Class.documentFrom(record[name]);
-                }
-                return record
-            }
-        ) )
-        return result
-    }
+    // -----------------------------------UTILS------------------------------------
 
 
-    // Utils
-    static emitSave(instance){
-        let id = instance ? instance.id : '*'
-        this.e.emit(`saved.${id}`, instance)
+    static Decorators = { ...datatypes, _shared, _public, _stream, _authorize, _session }
+
+    fields = { 
+        id: { name: 'id', type: 'SERIAL', constraints: { primaryKey: true } },
+        last_updated: { name: 'last_updated', type: 'int8',  constraints: {} }
     }
+
+    get persisted_fields(){
+        return filter(this.fields, (name, field) => field.type !== 'virtual')
+    }
+
+    get attributes(){
+        return map(this.persisted_fields, name => this[toCamelCase(name)])
+    }
+
+    _onChange(){}
 
 }
