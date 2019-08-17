@@ -94,7 +94,6 @@ export class EventEmitter {
     }
 
     of(namespace){
-        console.log(this.submodules)
         if(this.submodules[namespace]) return this.submodules[namespace]
         let newEmitter = this.submodules[namespace] = new EventEmitter 
         const proxyMarker = Symbol()
