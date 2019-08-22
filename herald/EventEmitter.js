@@ -3,14 +3,20 @@ const { Pipe } = require ('./Pipe')
 
 const bin = Symbol()
 const nodes = Symbol()
+const submodules = Symbol()
+
 let id = 0
 export class EventEmitter {
-
-    submodules = {}
 
     constructor(){
        this.id = id++
         Object.defineProperty(this, nodes, {
+            value: {},
+            enumerable: false,
+            writable: true
+        })
+
+        Object.defineProperty(this, submodules, {
             value: {},
             enumerable: false,
             writable: true
@@ -37,7 +43,7 @@ export class EventEmitter {
     }
 
     nowAndOn(events, callback){
-        let node = { calls: [], callback: (...args) => node.calls.push(args)}
+        let node = { events, calls: [], callback: (...args) => node.calls.push(args)}
         let stream1 = this.on(events)
         stream1.observe( (...args) => {
             node.callback(...args)
@@ -94,8 +100,8 @@ export class EventEmitter {
     }
 
     of(namespace){
-        if(this.submodules[namespace]) return this.submodules[namespace]
-        let newEmitter = this.submodules[namespace] = new EventEmitter 
+        if(this[submodules][namespace]) return this[submodules][namespace]
+        let newEmitter = this[submodules][namespace] = new EventEmitter 
         const proxyMarker = Symbol()
         this.on(`${namespace}.*`, (payload, event, metadata) => {
             if(metadata[proxyMarker]) return 

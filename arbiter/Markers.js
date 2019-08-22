@@ -89,15 +89,20 @@ const markStream = createMarkerDecorator('stream')
 
 const _session = (property) => {
     let original = property.descriptor.value
+    let newFunc = function(_, ...args){
+        return original.apply(this, args)      
+    }
     markSession(property)
     property.descriptor.value = function (...args) {
         let model = this;
-        return new Pipe(emit => {
+        let pipe = new Pipe(emit => {
             throw new SessionRequest(session => {
-                let result = new Pipe([model, original], session, ...args)
+                let result = new Pipe([model, newFunc], session, ...args)
                 result.observe(emit)
+                result.catch( err =>  pipe.throwError(err))
             })
         })
+        return pipe
     }
 
     return property
@@ -122,12 +127,35 @@ const _stream = function (property) {
     return value
 } 
 
+const _validate = validator => function(decorated){
+    decorated.extras = [ 
+        ...decorated.extras || [],
+        {
+            kind: "method",
+            placement: "static",
+            key: `validate_${decorated.key}`,
+            descriptor: {
+                value: validator
+            }
+        }
+    ]
+    let original = decorated.initializer;
+    decorated.initializer = function () {
+        let propertyName = `${this.constructor.name}.validate_${decorated.key}`
+        root.flags[propertyName] = root.flags[propertyName] || new Object
+        root.flags[propertyName].shared = true
+        return original.call(this)
+    }
+    return decorated
+}
+
 export {
     _shared,
     _stream,
     _session,
     _authorize,
     _public,
+    _validate,
 
     markersFor,
     clearMarkers,

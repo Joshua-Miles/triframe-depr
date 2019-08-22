@@ -21,8 +21,11 @@ export class Collection {
 
     @_shared
     get first(){
-        let index = this.indexes[0]
-        return this[index] === undefined ? null : this[index] 
+        const { ordered } = this
+        for(let i in ordered){
+            return ordered[i]
+        }
+        return null
     }
 
 
@@ -30,6 +33,16 @@ export class Collection {
     get last(){
         let index = this.indexes[this.indexes.length-1]
         return this[index]
+    }
+
+    @_shared
+    get ordered(){
+        let result = {}
+        for(let key in this){
+            if(isNaN(key)) continue
+            result[this[key].__index__] = this[key]
+         }
+        return result
     }
 
     @_shared 
@@ -92,9 +105,11 @@ export class Collection {
 
     @_shared
     map(callback){
-        let array = this.indexes.map( key => this[key])
-        let newArray = array.map(callback)
-        return newArray
+        let result = []
+        this.forEach( (...args) => {
+            result.push(callback(...args))
+        })
+        return result
     }
 
     @_shared
@@ -139,7 +154,12 @@ export class Collection {
    
     @_shared
     forEach(callback){
-        this.indexes.forEach( i => callback(this[i]))
+        let index = 0;
+        const { ordered } = this
+        for(let key in ordered){
+            if(isNaN(key) || key.startsWith('__')) continue
+            callback(ordered[key], index++)
+        }
     }
 
     @_shared

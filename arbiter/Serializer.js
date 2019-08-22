@@ -151,9 +151,13 @@ export class Serializer {
                         let emitUpdate = newDocument => {
                             document = newDocument
                             let newSerialized = this.serializeDocument(newDocument, session)
-                            let patch = jsonpatch.compare(serialized, newSerialized)
+                            if(newSerialized){
+                                let patch = jsonpatch.compare(serialized, newSerialized)
+                                emit(patch)
+                            } else {
+                                emit(newSerialized)
+                            }
                             serialized = newSerialized
-                            emit(patch)
                         }
                         pipe.observe(emitUpdate)
 
@@ -162,6 +166,7 @@ export class Serializer {
                         socket.on('disconnect', () => {
                             pipe.unobserve(emitUpdate)
                             if (pipe.observers.length == 0) {
+                                delete callCache[hash]
                                 pipe.destroy()
                             }
                         })
@@ -191,6 +196,8 @@ export class Serializer {
                 pipe.catch(err => {
                     if (err instanceof SessionRequest) {
                         err.callback(session)
+                    } else {
+                        respond({ error: true, message: err.message })
                     }
                 })
 
@@ -204,7 +211,7 @@ export class Serializer {
         if (typeof document === 'function') return {
             __type__: document.name
         }
-        if (propertyName) {
+        if (propertyName && session) {
             let { authorize, publish } = markersFor(propertyName)
             if (authorize && publish) throw Error('A field cannot be publish and require authorization')
             if (authorize) {
@@ -223,6 +230,7 @@ export class Serializer {
         return {
             ...map(document, (propertyName, object) => this.serializeDocument(object, session, `${document.constructor.name}#${propertyName}`)),
             __class__: document.constructor.name,
+            __index__: document.__index__
         }
     }
 

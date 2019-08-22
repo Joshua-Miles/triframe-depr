@@ -1,11 +1,15 @@
 import { DBConnection } from './DBConnection'
-import { _shared, _public, _stream, _authorize, _session  } from '../arbiter'
+import { _shared, _public, _stream, _authorize, _session, _validate  } from '../arbiter'
 import { datatypes } from './datatypes'
 import { toTableName, toCamelCase } from '../scribe'
 import { map, filter } from '../mason';
 import { EventEmitter } from '../herald';
 
-const global = new EventEmitter
+const agent = new EventEmitter
+
+agent.on('*', (payload, event) => {
+    console.log('EMITTED:', event)
+})
 
 export class Model extends DBConnection {
 
@@ -15,10 +19,9 @@ export class Model extends DBConnection {
         return toTableName(this.name)
     }
 
+    @_shared
     static get all(){
-        return this.query( ({ sql, self }) => (sql`
-            SELECT ${self('*')} FROM ${self};
-        `))
+        return this.where({})
     }
 
     @_stream
@@ -36,9 +39,13 @@ export class Model extends DBConnection {
         yield this.nowAndOn('*')
         return this.query( ({ sql, self, each }) => sql`
             SELECT ${self('*')} FROM ${self}
-            WHERE ${each(attributes, (key, value) => 
+            WHERE ${
+                Object.keys(attributes).length > 0 ?
+                each(attributes, (key, value) => 
                 `${key}=${value}`, 'AND'
-            )}
+                ) :
+                1
+            }
         `)
     }
 
@@ -85,13 +92,15 @@ export class Model extends DBConnection {
         return this.commit()
     }
 
+    @_shared
     update(attributes){
-        Object.assign(attributes)
+        this.set(attributes)
         return this.commit()
     }
 
     async commit(){
         const { attributes } = this;
+        console.log(attributes)
         delete attributes.id
         let result = await this.query( ({ sql, self, each }) => sql`
             UPDATE ${self} 
@@ -114,13 +123,30 @@ export class Model extends DBConnection {
     }
 
 
-    // --------------------------------EVENT ENGINE -------------------------------
-
-    static global = global
-
-    static get events(){
-        return global.of(this.name)
+    // --------------------------------VALIDATION ENGINE -------------------------------
+    @_shared
+    isValid(field){
+        return this.errorsFor(field).length == 0
     }
+
+    @_shared
+    errorsFor(field){
+        let Model = this.constructor
+        let validator = Model[`validate_${field}`]
+        if(!validator) return [];
+        let errors = []
+        let func = validator(this[field], this)
+        let iterator = func.next()
+        while(!iterator.done) {
+            errors.push(iterator.value)
+            iterator = func.next()
+        }
+        return errors
+    }
+
+    
+
+    // --------------------------------EVENT ENGINE -------------------------------
 
     static on(...args){
         return this.events.on(...args)
@@ -133,10 +159,6 @@ export class Model extends DBConnection {
     static nowAndOn(...args){
         return this.events.nowAndOn(...args)
     }
-
-    global = global
-
-    events = global.of(this.constructor.name)
 
     on(...args){
         return this.events.on(...args)
@@ -155,13 +177,9 @@ export class Model extends DBConnection {
     // -----------------------------------UTILS------------------------------------
 
 
-    static Decorators = { ...datatypes, _shared, _public, _stream, _authorize, _session }
+    static Decorators = { ...datatypes, _shared, _public, _stream, _authorize, _session, _validate }
 
-    fields = { 
-        id: { name: 'id', type: 'SERIAL', constraints: { primaryKey: true } },
-        last_updated: { name: 'last_updated', type: 'int8',  constraints: {} }
-    }
-
+    
     get persisted_fields(){
         return filter(this.fields, (name, field) => field.type !== 'virtual')
     }
@@ -172,4 +190,43 @@ export class Model extends DBConnection {
 
     _onChange(){}
 
+
+    constructor(){
+        super()
+        Object.defineProperty(this, 'fields', {
+            enumerable: false,
+            writable: true,
+            value:  { 
+                id: { name: 'id', type: 'SERIAL', constraints: { primaryKey: true } },
+                last_updated: { name: 'last_updated', type: 'int8',  constraints: {} }
+            }
+        })
+
+        Object.defineProperty(this, 'global', {
+            enumerable: false,
+            writable: true,
+            value: agent
+        })
+
+        Object.defineProperty(this, 'events', {
+            enumerable: false,
+            writable: true,
+            value: agent.of(this.constructor.name)
+        })
+
+    }
+
 }
+
+Object.defineProperty(Model, 'global', {
+    enumerable: false,
+    writable: true,
+    value: agent
+})
+
+Object.defineProperty(Model, 'events', {
+    enumerable: false,
+    get: function(){
+        return agent.of(this.name)
+    }
+})

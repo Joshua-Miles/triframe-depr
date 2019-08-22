@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Dimensions, View } from "react-native";
+import { Dimensions, View, StyleSheet } from "react-native";
 import { each } from "../mason";
-
 export const createGrid = sizes => {
 
     const GridContext = React.createContext({ base: 12 });
 
     const Grid = ({ children, base = 12, gutter = 0.5 }) => (
-       <View style={{flex: 1, flexWrap: "wrap", display: "flex", flexDirection: "row", height: `100%`}} >
+       <View style={{flex: 1, flexDirection: 'row', flexWrap: "wrap", display: "flex", height: `100%`}} >
            <GridContext.Provider value={{ base, gutter }}>
                 {children}
            </GridContext.Provider>
@@ -56,11 +55,11 @@ export const createGrid = sizes => {
         }
 
         if(inline){
-            styles.flexDirection = 'row'
+            styles.flexDirection='row'
         }
 
         if(right){
-            if(styles.flexDirection == 'row') styles.justifyContent= 'flex-end'
+            if(inline) styles.justifyContent= 'flex-end'
             else styles.alignItems = 'flex-end'
         }
 
@@ -94,3 +93,9 @@ const useScreenSize = (props) => {
    
     return sizes
 }
+
+const stylesheet = StyleSheet.create({
+    inline: {
+        flexDirection: 'row'
+    }
+})

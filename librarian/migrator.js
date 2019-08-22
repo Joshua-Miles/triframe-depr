@@ -32,7 +32,7 @@ const alterColumn = (name, operations) => (
 const defineColumn = (name, { type, typeModifier, defaults, constraints }) => {
     let definition = `"${name}" ${type}`
     if(typeModifier) definition = `${definition}(${typeModifier})`
-    if(typeof defaults == 'number' || typeof defaults == 'boolean' ||  defaults == null) definition = `${definition} DEFAULT ${defaults}`
+    if(typeof defaults == 'number' || typeof defaults == 'boolean' ||  defaults === null) definition = `${definition} DEFAULT ${defaults}`
     else if (defaults !== undefined) definition = `${definition} DEFAULT '${defaults}'`
     if(constraints) definition = `${definition} ${defineConstraints(constraints)}`
     return definition

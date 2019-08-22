@@ -52,7 +52,11 @@ export class UnSerializer {
     }
 
     unSerializeType({ name, classProperties, instanceProperties }, agent) {
-        const Type = class { }
+        const Type = class { 
+            constructor(attributes){
+                Object.assign(this, attributes)
+            }
+        }
         Object.defineProperty(Type, 'name', { value: name })
         this.unSerializeObject(Type, classProperties, agent.of('class'))
         this.unSerializeObject(Type.prototype, instanceProperties, agent.of('instance'))
@@ -136,11 +140,14 @@ export class UnSerializer {
                         devtools.initial(response)
                         serializedResult = response
                         emitDocument()
-                    } else {
+                    } else if(response){
                         let docChanged = reconcileOperations(response)
                         if(docChanged){
                             emitDocument()
                         }
+                    } else {
+                        serializedResult = response
+                        emitDocument()
                     }
                 }
 
@@ -228,7 +235,7 @@ export class UnSerializer {
         if (!document.__class__ && typeof document != 'object') return document
         let result = this.types[document.__class__] ? new this.types[document.__class__] : new Object
         Object.assign(result, map(document, (propertyName, document) => this.unSerializeDocument(document, callback, `${path}/${propertyName}`)))
-        let resultSnapshot = snapshot(result)
+        let resultSnapshot = snapshot(result) 
         //setTimeout(() => resultSnapshot = snapshot(result))
         Object.defineProperty(result, '_onChange', {
             value: function () {

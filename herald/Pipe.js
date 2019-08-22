@@ -8,9 +8,9 @@ export class Pipe {
     errorHandlers = []
     cancelationHandlers = []
 
-    constructor(process, ...args){
+    constructor(process, ...args) {
         let thisArg;
-        if(Array.isArray(process)){
+        if (Array.isArray(process)) {
             thisArg = process[0];
             process = process[1];
         }
@@ -18,40 +18,40 @@ export class Pipe {
         this.thisArg = thisArg
         this.args = args
         setTimeout(() => {
-            if(!this.alreadyInitialized && !this.isCanceled) this[execute]()
+            if (!this.alreadyInitialized && !this.isCanceled) this[execute]()
         })
     }
 
-    observe(callback){
-        if(this.cachedValue) callback(this.cachedValue)
+    observe(callback) {
+        if (this.cachedValue) callback(this.cachedValue)
         this.observers.push(callback)
     }
 
-    unobserve(callback){
+    unobserve(callback) {
         this.observers = this.observers.filter(observer => observer != callback)
     }
 
-    then(callback, errorHandler = null){
-        if(errorHandler) this.catch(errorHandler)
-        if(this.currentValue) callback(this.currentValue)
+    then(callback, errorHandler = null) {
+        if (errorHandler) this.catch(errorHandler)
+        if (this.currentValue) callback(this.currentValue)
         let resolve = () => resolve = true
-        this.listeners.push( async (...args) => {
+        this.listeners.push(async (...args) => {
             await callback(...args)
             resolve()
         })
-        return new Promise( ref => resolve === true ? ref() : resolve = ref)
+        return new Promise(ref => resolve === true ? ref() : resolve = ref)
     }
 
-    catch(callback){
+    catch(callback) {
         this.errorHandlers.push(callback)
     }
 
-    onCancel(callback){
+    onCancel(callback) {
         this.cancelationHandlers.push(callback)
-    }  
+    }
 
-    apply(callback){
-        if(this.currentValue){
+    apply(callback) {
+        if (this.currentValue) {
             callback(this.currentValue)
         } else {
             this.then(callback);
@@ -62,66 +62,80 @@ export class Pipe {
 
     emit = async (...args) => {
         this.currentValue = args[0];
-        let listeners = [ ...this.listeners ]
-        let observers = [ ...this.observers ]
+        let listeners = [...this.listeners]
+        let observers = [...this.observers]
         this.listeners = []
         await Promise.all([
-            ...listeners.map( listener => listener(...args) ),
-            ...observers.map( observer => observer(...args) )
+            ...listeners.map(listener => listener(...args)),
+            ...observers.map(observer => observer(...args))
         ])
     }
 
     throwError = (err) => {
-        this.errorHandlers.forEach( handler => handler(err) )
+        this.errorHandlers.forEach(handler => handler(err))
     }
 
     [execute] = async () => {
         let cursor;
-        try{
+        try {
             cursor = this.process.call(this.thisArg, this.emit, ...this.args)
-        } catch(err){
+        } catch (err) {
             this.throwError(err)
         }
 
-        const process = async ({ value, done }) => {
-            const { isPipe, isPromise } = this.constructor
-            const { cached, cache } = this
-            const cachedValue = cached(value)
-            
-            let next;
-            if(done && value === undefined) return
-            if(done) next = this.emit
-            else next = moveCursor
 
-            if(cachedValue) await next(cachedValue.currentValue);
-            else if(isPipe(value)){ value.catch(this.throwError); value.apply( result => { cache(value); next(result); }); }
-            else if(isPromise(value)){ await value.then(next); if(value.catch) value.catch(this.throwError)}
-            else await next(value);
+
+        const process = ({ value, done }) => {
+            return new Promise(async () => {
+                const { isPipe, isPromise } = this.constructor
+                const { cached, cache } = this
+                const cachedValue = cached(value)
+
+                let next;
+                if (done && value === undefined) return
+                if (done) next = this.emit
+                else next = moveCursor
+
+                if (cachedValue) await next(cachedValue.currentValue);
+                else if (isPipe(value)) { 
+                    value.apply(result => { 
+                        cache(value); 
+                        next(result); 
+                    }); 
+                    value.catch(this.throwError)
+                }
+                else if (isPromise(value)) { 
+                    await value
+                            .then(next)
+                            .catch(this.throwError)
+                }
+                else await next(value);
+            })
         }
 
         const moveCursor = result => process(cursor.next(result))
- 
-        if(cursor && typeof cursor.next == 'function') await moveCursor(); 
+
+        if (cursor && typeof cursor.next == 'function') await moveCursor();
         else await process({ value: cursor, done: true })
     }
 
     cache = pipe => {
-        pipe.observe(() => { 
-            if((this.observers.length || this.listeners.length) && !this.isCanceled) this[execute]() 
+        pipe.observe(() => {
+            if ((this.observers.length || this.listeners.length) && !this.isCanceled) this[execute]()
         })
         this.dependencies.push(pipe)
     }
 
-    destroy(){
-        this.isCanceled = true 
-        this.cancelationHandlers.forEach( callback => callback() )
-        this.dependencies.forEach( pipe => pipe.destroy() )
+    destroy() {
+        this.isCanceled = true
+        this.cancelationHandlers.forEach(callback => callback())
+        this.dependencies.forEach(pipe => pipe.destroy())
     }
 
     cached = pipe => {
-        let cachedPipe = this.dependencies.find( dependency => dependency.isEqual(pipe))
-        if(cachedPipe){
-            if(cachedPipe !== pipe) pipe.destroy()
+        let cachedPipe = this.dependencies.find(dependency => dependency.isEqual(pipe))
+        if (cachedPipe) {
+            if (cachedPipe !== pipe) pipe.destroy()
             return cachedPipe
         }
     }
@@ -131,4 +145,4 @@ export class Pipe {
     static isPipe = value => value && typeof value.observe == 'function'
 
     static isPromise = value => value && typeof value.then == 'function'
- }
+}

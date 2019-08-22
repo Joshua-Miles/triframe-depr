@@ -46,6 +46,7 @@ export default class Server {
                 session = this.unserializer.unSerializeDocument(JSON.parse(fs.readFileSync(`${SESSIONS_PATH}/${oldToken}.json`)))
                 fs.unlinkSync(`${SESSIONS_PATH}/${oldToken}.json`)
             } catch(err){
+                console.log(err)
                 session = {} 
             }
         } else {

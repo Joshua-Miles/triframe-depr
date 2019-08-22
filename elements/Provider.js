@@ -9,7 +9,13 @@ import { crawl } from '../mason';
 
 const Model = React.createContext({ areReady: false })
 
-export const Provider = ({ children, iconSets = ['MaterialIcons'], serverURL = '' }) => {
+export const Provider = (props) => (
+    <PaperProvider>
+        <Main {...props} />
+    </PaperProvider>
+)
+
+const Main = ({ children, iconSets = ['MaterialIcons'], serverURL = '' }) => {
     let [models, saveModels] = useState({ areReady: false })
     useEffect(() => {
         let counter = 0;
@@ -39,21 +45,19 @@ export const Provider = ({ children, iconSets = ['MaterialIcons'], serverURL = '
     }, [])
     return (
         <Model.Provider value={models}>
-            <PaperProvider>
-                <Router>
-                    {Platform.OS === 'web' ? (
-                        <style type="text/css">{`
-                        ${iconSets.map(iconSet => (
-                            `@font-face {
-                                font-family: ${iconSet};
-                                src: url(${require(`react-native-vector-icons/Fonts/${iconSet}.ttf`)}) format('truetype');
-                            }`
-                        ))}
-                    `}</style>
-                    ) : null}
-                    {children}
-                </Router>
-            </PaperProvider>
+            {Platform.OS === 'web' ? (
+            <style type="text/css">{`
+                ${iconSets.map(iconSet => (
+                `@font-face {
+                        font-family: ${iconSet};
+                        src: url(${require(`react-native-vector-icons/Fonts/${iconSet}.ttf`)}) format('truetype');
+                    }`
+            ))}
+            `}</style>
+        ) : null}
+            <Router>
+                {children}
+            </Router>
         </Model.Provider>
     )
 }
@@ -142,7 +146,7 @@ export const tether = Component => props => {
     )
 }
 
-let ConnectedComponent = withRouter(({ props, models, Component, history, match, location }) => {
+let ConnectedComponent = withRouter(({ props = [], models, Component, history, match, location }) => {
     let jsx = null
 
     const [data, dispatch] = useState({ jsx })

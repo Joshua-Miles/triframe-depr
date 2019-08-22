@@ -174,7 +174,7 @@ const remove = (collection, targetElement) => {
     targetKeys.forEach( key => delete collection[key])
 }
 const primativeTypes = [ 'String', 'Boolean', 'Number', 'Date', 'Function' ]
-const isPlain = value => typeof value === 'object' && !primativeTypes.includes(value.constructor.name)
+const isPlain = value => value && typeof value === 'object' && !primativeTypes.includes(value.constructor.name)
 
 const crawl = (obj, callback) => {
     if(isPlain(obj)){

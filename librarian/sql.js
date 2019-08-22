@@ -14,9 +14,11 @@ export async function query(callback) {
         console.log(query)
         let response = await database.query(query, escaped)
         let results = {}
-        response.rows.forEach( row => formatResult(row, results))
+        response.rows.forEach( (row, index) => {
+            formatResult(row, results, index)
+        })
         const [ result ] = Object.values(results)
-        return result
+        return result || new Collection
     }
 
     const createLibrary = models => {
@@ -63,7 +65,7 @@ export async function query(callback) {
 
     const createModelRep = (name, Model, models) => {
         let instance = new Model
-        function ModelRep(...fields) {
+        const ModelRep = (...fields) => {
             let select = fields.map((field, index) => {
                 if(field == '*'){
                     return Object.keys(filter(instance.fields, (key, field) => field.type != 'virtual')).map( (key) => {
@@ -74,7 +76,8 @@ export async function query(callback) {
                     throw Error(`No such column ${field} for table ${name}`)
                 }
                 return resolveParameter(ModelRep[field])
-            }, '').join(',')
+            }, '')
+            select = select.join(',')
             return createLiteral(`${select}, '${Model.name}' as "${name}.__class__"`)
         }
         ModelRep.asLiteral = () => `${Model.tableName} as "${Model.tableName}.[i]"`
@@ -96,8 +99,10 @@ export async function query(callback) {
                     })
                     break;
                 default:
-                    ModelRep[key] = createLiteral(`${name}.${toUnderscored(key)}`)
-                    break
+                    Object.defineProperty(ModelRep, key, {
+                        value: createLiteral(`"${name}".${toUnderscored(key)}`)
+                    })
+                break
             }
         })
         return ModelRep
@@ -129,7 +134,7 @@ export async function query(callback) {
     }
 
 
-    let formatResult = (record, result) => {
+    let formatResult = (record, result, index) => {
         let next = {}
         each(record, ( key, value ) => {
             let [ first, ...rest ] = key.split('.')
@@ -144,18 +149,19 @@ export async function query(callback) {
         each(next, (key, value) => {
             if(key === '[i]'){
                 let lookahead = {}
-                formatResult(value, lookahead)
+                formatResult(value, lookahead, index)
                 if(lookahead.id === null) return
                 let Model = types[lookahead.__class__]
                 result[lookahead.id] = result[lookahead.id] || new Model;
-                formatResult(value, result[lookahead.id])
+                result[lookahead.id].__index__ = result[lookahead.id].__index__ || index
+                formatResult(value, result[lookahead.id], index)
             } else {
                 let lookahead = {}
-                formatResult(value, lookahead)
+                formatResult(value, lookahead, index)
                 if(lookahead.id === null) return
                 if(!key.startsWith('__')) key = toCamelCase(key)
                 result[key] = result[key] || containerFor(value)
-                formatResult(value, result[key])
+                formatResult(value, result[key], index)
             }
         })
     }
