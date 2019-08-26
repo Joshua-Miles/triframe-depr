@@ -121,6 +121,8 @@ let createUse = () => {
 
 const savedContexts = []
 
+window.savedContexts = savedContexts
+
 const createUseContext = models => context => {
     let pipe;
     let cached = savedContexts.find(cached => cached.context === context)
@@ -152,6 +154,7 @@ let ConnectedComponent = withRouter(({ props = [], models, Component, history, m
     const [data, dispatch] = useState({ jsx })
 
     useEffect(() => {
+        let pipe;
         (async () => {
             if (models.areReady === false) return
 
@@ -161,12 +164,13 @@ let ConnectedComponent = withRouter(({ props = [], models, Component, history, m
             let useContext = createUseContext(models)
 
             let payload = { models, props, whileLoading, useContext, use, history, match, location }
-            let pipe = new Pipe(() => Component(payload), payload)
+            pipe = new Pipe(() => Component(payload), payload)
             pipe.observe(jsx => {
                 restartUse()
                 dispatch({ jsx })
             })
         })()
+        return () => pipe && pipe.destroy()
     }, [models.areReady, ...Object.values(props)])
     return data.jsx
 })

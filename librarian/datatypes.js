@@ -1,13 +1,14 @@
-import { toColumnName, toForeignKeyName } from '../scribe'
+import { toColumnName, toForeignKeyName, toCamelCase } from '../scribe'
 import { map } from '../mason'
+import { root } from '../arbiter/Markers'
 
 const types = {
 
-    string:{
+    string: {
         type: 'varchar'
     },
 
-    text:{
+    text: {
         type: 'text'
     },
 
@@ -26,7 +27,7 @@ const types = {
     hasMany: {
         type: 'virtual',
         hasModifier: true,
-        
+
     },
 
     belongsTo: {
@@ -35,13 +36,13 @@ const types = {
             foreignKey: true
         }
     },
-    
+
     float: {
         type: 'float8'
     },
 
     boolean: {
-        type: 'boolean'
+        type: 'bool'
     },
 
     timestamp: {
@@ -83,29 +84,33 @@ const types = {
     circle: {
         type: 'circle'
     },
-    
+
 }
 
-const createFieldDecorator = (alias, { type, hasModifier, constraints = {}, createField = defaultFieldCreator }) => function(arg1, arg2){
+const createFieldDecorator = (alias, { type, hasModifier, constraints = {}, createField = defaultFieldCreator }) => function (arg1, arg2) {
     let property, typeModifier;
-    
-    if(hasModifier){
+
+    if (hasModifier) {
         typeModifier = arg1
         Object.assign(constraints, arg2 || new Object)
-    } 
-    if(arg1.key){ 
+    }
+    if (arg1.key) {
         property = arg1
     } else {
         Object.assign(constraints, arg1 || new Object)
     }
-    if(property) return  createField(alias, property, type, typeModifier, constraints )
-    else return property => createField(alias, property, type, typeModifier, constraints )
+    if (property) return createField(alias, property, type, typeModifier, constraints)
+    else return property => createField(alias, property, type, typeModifier, constraints)
 }
 
-const defaultFieldCreator = function(alias, property, type, typeModifier, constraints = {}){
+const defaultFieldCreator = function (alias, property, type, typeModifier, constraints = {}) {
     const format = constraints.foreignKey ? toForeignKeyName : toColumnName;
     const name = format(property.key)
-    const initializer = function(){
+    const initializer = function () {
+        let propertyName = `${this.constructor.name}#${property.key}`
+        let columnName = `${this.constructor.name}#${toCamelCase(name)}`
+        root.flags[propertyName] = root.flags[propertyName] || {}
+        root.flags[columnName] = root.flags[propertyName]
         const defaults = property.initializer.call(this)
         this.fields[name] = ({ alias, name, type, typeModifier, defaults, constraints })
         return defaults

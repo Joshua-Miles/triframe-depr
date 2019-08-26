@@ -1,5 +1,5 @@
 import { each, index, filter } from "../mason";
-import { toUnderscored, toCamelCase, toCapitalized, toSingular, toForeignKeyName } from "../scribe";
+import { toUnderscored, toCamelCase, toCapitalized, toSingular, toForeignKeyName, toTableName } from "../scribe";
 import { Collection } from "./Collection";
 
 export async function query(callback) {
@@ -12,6 +12,7 @@ export async function query(callback) {
         let library = createLibrary(types)
         let query = callback(library)
         console.log(query)
+        // console.log(escaped)
         let response = await database.query(query, escaped)
         let results = {}
         response.rows.forEach( (row, index) => {
@@ -68,36 +69,55 @@ export async function query(callback) {
         const ModelRep = (...fields) => {
             let select = fields.map((field, index) => {
                 if(field == '*'){
-                    return Object.keys(filter(instance.fields, (key, field) => field.type != 'virtual')).map( (key) => {
+                    return Object.keys(filter(instance.fields, (key, field) => field.type != 'virtual' && key != 'id')).map( (key) => {
                         return `"${name}".${key} as "${name}.${key}"`
                     }).join(',')
                 }
                 if (!ModelRep[field]) {
                     throw Error(`No such column ${field} for table ${name}`)
                 }
-                return resolveParameter(ModelRep[field])
-            }, '')
+                return `${resolveParameter(ModelRep[field])} as "${name}.${field}"`
+            })
             select = select.join(',')
-            return createLiteral(`${select}, '${Model.name}' as "${name}.__class__"`)
+            return createLiteral(`${select}, "${name}".id as "${name}.id", '${Model.name}' as "${name}.__class__"`)
         }
         ModelRep.asLiteral = () => `${Model.tableName} as "${Model.tableName}.[i]"`
         each(instance.fields, (key, field) => {
             switch (field.alias) {
                 case 'hasMany':
-                    let opts = field.typeModifier
-                    let alias = toForeignKeyName(toSingular(opts.as || Model.tableName))
-                    let relationTable = opts.of || key;
-                    let relationName = `${name}.${key}.[i]`
-                    let Relation = models[relationTable]
+                    var opts = field.typeModifier
+                    var alias = toForeignKeyName(toSingular(opts.as || Model.tableName))
+                    var relationTable = opts.of || key;
+                    var relationName = `${name}.${key}.[i]`
+                    var Relation = models[relationTable]
                     if(!Relation) throw Error(`Could not find relation "${key}"`)
                     define(ModelRep, key, () => {
-                        let relationCollection = createModelRep(relationName, Relation, models)
+                        var relationCollection = createModelRep(relationName, Relation, models)
                         relationCollection.join = () => createLiteral(
                             `LEFT JOIN ${relationTable} as "${relationName}" ON "${relationName}".${alias}="${name}".id`
                         )
                         return relationCollection
                     })
                     break;
+                case 'belongsTo':
+                    Object.defineProperty(ModelRep, key, {
+                        value: createLiteral(`"${name}".${toUnderscored(key)}`)
+                    })
+                    key = key.substr(0, key.length-3)
+                    var relationTable = toTableName( key);
+                    var relationName = `${name}.${key}`
+                    var Relation = models[relationTable]
+                    if(!Relation) throw Error(`Could not find relation "${key}"`)
+                    var alias = toForeignKeyName(toSingular(Relation.tableName))
+                    define(ModelRep, key, () => {
+                        var relationCollection = createModelRep(relationName, Relation, models)
+                        relationCollection.join = () => createLiteral(
+                            `LEFT JOIN ${relationTable} as "${relationName}" ON "${name}".${alias}="${relationName}".id`
+                        )
+                        return relationCollection
+                    })
+                   
+                    break
                 default:
                     Object.defineProperty(ModelRep, key, {
                         value: createLiteral(`"${name}".${toUnderscored(key)}`)
@@ -151,7 +171,7 @@ export async function query(callback) {
                 let lookahead = {}
                 formatResult(value, lookahead, index)
                 if(lookahead.id === null) return
-                let Model = types[lookahead.__class__]
+                let Model = types[lookahead.__class__] || Object
                 result[lookahead.id] = result[lookahead.id] || new Model;
                 result[lookahead.id].__index__ = result[lookahead.id].__index__ || index
                 formatResult(value, result[lookahead.id], index)
@@ -160,7 +180,9 @@ export async function query(callback) {
                 formatResult(value, lookahead, index)
                 if(lookahead.id === null) return
                 if(!key.startsWith('__')) key = toCamelCase(key)
-                result[key] = result[key] || containerFor(value)
+                if(lookahead.__class__ && typeof types[lookahead.__class__] == 'function') next = new types[lookahead.__class__]
+                else next = containerFor(value)
+                result[key] = result[key] ||  next
                 formatResult(value, result[key], index)
             }
         })

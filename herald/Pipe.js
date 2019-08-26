@@ -120,16 +120,17 @@ export class Pipe {
     }
 
     cache = pipe => {
-        pipe.observe(() => {
+        let observer = () => {
             if ((this.observers.length || this.listeners.length) && !this.isCanceled) this[execute]()
-        })
+        }
+        pipe.observe(observer)
+        this.onCancel(() => pipe.unobserve(observer))
         this.dependencies.push(pipe)
     }
 
     destroy() {
         this.isCanceled = true
         this.cancelationHandlers.forEach(callback => callback())
-        this.dependencies.forEach(pipe => pipe.destroy())
     }
 
     cached = pipe => {

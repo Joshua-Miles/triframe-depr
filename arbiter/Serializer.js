@@ -208,9 +208,6 @@ export class Serializer {
     }
 
     serializeDocument(document, session, propertyName = false) {
-        if (typeof document === 'function') return {
-            __type__: document.name
-        }
         if (propertyName && session) {
             let { authorize, publish } = markersFor(propertyName)
             if (authorize && publish) throw Error('A field cannot be publish and require authorization')
@@ -220,9 +217,15 @@ export class Serializer {
                 else authorizer = authorize.unless, message = authorize.message
                 if (!authorizer(session)) return undefined
             }
-            if (!authorize && !publish && !propertyName.startsWith('Collection') && !propertyName.startsWith('_')) {
+            if (!authorize && !publish && !propertyName.startsWith('Collection') && !propertyName.includes('_') && !propertyName.startsWith('Object') && !propertyName.startsWith('Array')) {
+                //console.log('blocked', propertyName)
                 return undefined
+            } else {
+                //console.log(propertyName)
             }
+        }
+        if (typeof document === 'function') return {
+            __type__: document.name
         }
         if (!document) return document
 

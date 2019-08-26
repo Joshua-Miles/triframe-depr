@@ -8,6 +8,15 @@ if (!fs.existsSync(SESSIONS_PATH)){
     fs.mkdirSync(SESSIONS_PATH);
 }
 
+function loadModels(r) { 
+    const models = {}
+    r.keys().forEach(key => {
+        let [ Model ] = key.substr(2).split('.')
+        models[Model] = r(key)[Model]
+    }); 
+    return models
+}
+
 export default class Server {
 
     constructor(...args){
@@ -15,6 +24,7 @@ export default class Server {
     }
 
     async boot(types, { user, password, database, port } = {}){
+        types = typeof types == 'function' ? loadModels(types) : types
         await Model.connect({ user, password, database, port })
         await Model.migrate(types)
         this.io = socketIo(80);

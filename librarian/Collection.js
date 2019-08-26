@@ -40,7 +40,8 @@ export class Collection {
         let result = {}
         for(let key in this){
             if(isNaN(key)) continue
-            result[this[key].__index__] = this[key]
+            let index = this[key].__index__ === undefined ? key : this[key].__index__
+            result[index] = this[key]
          }
         return result
     }

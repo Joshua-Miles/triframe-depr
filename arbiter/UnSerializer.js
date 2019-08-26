@@ -115,7 +115,7 @@ export class UnSerializer {
             const method = function (...args) {
                 let openPipe = () => new Pipe([this, ambassador], ...args)
                 if (cache) {
-                    let hash = JSON.stringify(args)
+                    let hash = JSON.stringify({ args, attributes: this })
                     if (!bin[hash]) {
                         bin[hash] = openPipe()
                     } 
