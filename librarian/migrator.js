@@ -280,7 +280,7 @@ const patchColumnAttributes = (columnName, currentSchema, updatedSchema) => {
     let { added, removed, different } = comparisonOf(currentSchema, updatedSchema)
     let commands = new Array
     if( different('type') ){ console.log(currentSchema.type, updatedSchema.type);commands.push( setType(columnName, updatedSchema.type) )}
-    if( updatedSchema.defaults && different('defaults') ) commands.push( setColumnDefault(columnName, updatedSchema.defaults) )
+    if( updatedSchema.defaults && different('defaults') )commands.push( setColumnDefault(columnName, updatedSchema.defaults) )
     if( removed('defaults') ) commands.push( dropColumnDefault(columnName) )
     commands = [ ...commands, patchColumnConstraints(columnName, currentSchema.constraints, updatedSchema.constraints)]
     return commands.filter( a => a.length).join(', ')
@@ -304,7 +304,7 @@ const patchColumnConstraints = (columnName, currentSchema, updatedSchema) => {
 const comparisonOf = function(thing1, thing2){
     let removed = key => thing1[key] && !thing2[key]
     let added = key => !thing1[key] && thing2[key]
-    let different = key => serialize(thing1[key]) != serialize(thing2[key])
+    let different = key => thing1[key] != thing2[key] && serialize(thing1[key]) != serialize(thing2[key])
     return { added, removed, different }
 }
 

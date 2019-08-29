@@ -11,8 +11,10 @@ if (!fs.existsSync(SESSIONS_PATH)){
 function loadModels(r) { 
     const models = {}
     r.keys().forEach(key => {
-        let [ Model ] = key.substr(2).split('.')
-        models[Model] = r(key)[Model]
+        let [ Model ] = key.substr(2).split(/\.|\//)
+        let module = r(key)
+        if(module[Model]) models[Model] = module[Model]
+        if(module._default && key.includes(`${Model}/index`)) models[Model] = module._default
     }); 
     return models
 }

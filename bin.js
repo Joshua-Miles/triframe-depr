@@ -27,7 +27,7 @@ program
                 await fs.writeFile(`${name}/package.json`, JSON.stringify(loadPackageConfig(name), null, 2))
                 await exec(`cd "${name}" && npm install && npm link triframe`)
                 progress.update(75)
-                    ;['web', 'src', 'webpack.config.js', 'index.js', 'tsconfig.json', 'server.js', '.eslintrc.js'].forEach(async folder => {
+                    ;['web', 'src', 'webpack.config.js', 'index.js', 'server.js', '.eslintrc.js'].forEach(async folder => {
                         let source = path.join(__dirname, '_lib', folder)
                         let destination = path.join(process.cwd(), name, folder)
                         await new Promise(resolve => ncp(source, destination, resolve))
