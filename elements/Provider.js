@@ -15,12 +15,12 @@ export const Provider = (props) => (
     </PaperProvider>
 )
 
-const Main = ({ children, iconSets = ['MaterialIcons'], serverURL = '' }) => {
+const Main = ({ children, iconSets = ['MaterialIcons'], url = '' }) => {
     let [models, saveModels] = useState({ areReady: false })
     useEffect(() => {
         let counter = 0;
         let token = localStorage.getItem('token')
-        let io = socketIo(serverURL, token ? {
+        let io = socketIo(url, token ? {
             query: { token }
         } : undefined)
         io.on('token', token => {

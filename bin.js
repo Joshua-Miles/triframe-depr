@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 const program = require('commander')
-const fs = require('promise-fs')
+const fs = require('fs').promises
 const exec = require('util').promisify(require('child_process').exec)
 const ncp = require('ncp').ncp;
 const path = require('path')
@@ -12,8 +12,10 @@ const progress = new CliProgress.Bar({}, CliProgress.Presets.shades_classic);
 program
     .command('new <name>')
     .action(async (name) => {
+        console.log('Starting...')
         exec('npm ls -g react-native')
             .catch(() => {
+                console.log('Instaling React Native...')
                 return exec('npm install -g react-native')
             })
             .then(async () => {
@@ -23,9 +25,9 @@ program
                 progress.update(50)
                 await fs.unlink(`${name}/App.js`)
                 await fs.writeFile(`${name}/package.json`, JSON.stringify(loadPackageConfig(name), null, 2))
-                await exec(`cd "${name}" && npm install`)
+                await exec(`cd "${name}" && npm install && npm link triframe`)
                 progress.update(75)
-                    ;['web', 'src', 'webpack.config.js', 'index.js', 'api.js', 'server.js', '.eslintrc.js'].forEach(async folder => {
+                    ;['web', 'src', 'webpack.config.js', 'index.js', 'tsconfig.json', 'server.js', '.eslintrc.js'].forEach(async folder => {
                         let source = path.join(__dirname, '_lib', folder)
                         let destination = path.join(process.cwd(), name, folder)
                         await new Promise(resolve => ncp(source, destination, resolve))

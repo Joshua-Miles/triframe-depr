@@ -24,9 +24,9 @@ const ModuleNotFoundPlugin = require('react-dev-utils/ModuleNotFoundPlugin');
 const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin-alt');
 const typescriptFormatter = require('react-dev-utils/typescriptFormatter');
 const nativeModulePaths = fs.readdirSync(paths.appNodeModules)
-                              .filter( name => name.includes('expo') || name.includes('native'))
+                              .filter( name => name.includes('expo') || name.includes('native') || name.includes('triframe'))
                               .map( name =>  path.resolve(paths.appNodeModules, name))
-
+nativeModulePaths.push(path.join(paths.appNodeModules, 'triframe'))
 // Source maps are resource heavy and can cause out of memory issue for large source files.
 const shouldUseSourceMap = process.env.GENERATE_SOURCEMAP !== 'false';
 // Some apps do not need the benefits of saving a web request, so not inlining the chunk
@@ -246,6 +246,7 @@ module.exports = function(webpackEnv) {
       runtimeChunk: true,
     },
     resolve: {
+      symlinks: false,
       // This allows you to set a fallback for where Webpack should look for modules.
       // We placed these paths second because we want `node_modules` to "win"
       // if there are any conflicts. This matches Node resolution mechanism.
@@ -600,7 +601,7 @@ module.exports = function(webpackEnv) {
             '!**/src/setupProxy.*',
             '!**/src/setupTests.*',
           ],
-          watch: paths.appSrc,
+          watch: [paths.appSrc, path.join(paths.appNodeModules, 'triframe')],
           silent: true,
           formatter: typescriptFormatter,
         }),

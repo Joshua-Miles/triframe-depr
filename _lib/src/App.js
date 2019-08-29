@@ -1,22 +1,16 @@
 import React from 'react'
-import { Title, Provider, Platform } from 'triframe/elements'
+import { tether, Title, Provider } from 'triframe/elements'
 
-const App = () => (
-    <Provider>
-      {Platform.OS === 'web' ? (
-        <style type="text/css">{`
-            @font-face {
-              font-family: 'MaterialIcons';
-              src: url(${require('react-native-vector-icons/Fonts/MaterialIcons.ttf')}) format('truetype');
-            }
-            @font-face {
-              font-family: 'FontAwesome';
-              src: url(${require('react-native-vector-icons/Fonts/FontAwesome.ttf')}) format('truetype');
-            }
-          `}</style>
-        ) : null}
-        <Title>Hello World</Title>
-    </Provider>
+function* App({ models, history, props, use, useContext }) {
+  return (
+    <Title>Hello World</Title>
+  )
+}
+
+
+const TetheredApp = tether(App)
+export default () => (
+  <Provider url="http://localhost">
+    <TetheredApp />
+  </Provider>
 )
-
-export default App

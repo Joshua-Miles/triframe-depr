@@ -25,7 +25,7 @@ const createMarkerDecorator = name => createOptionalArgumentDecorator((decorated
             placement: "own",
             descriptor: {},
             initializer() {
-                delete this[temp] 
+                delete this[temp]
                 methods.forEach(method => {
                     let placement = method.startsWith('#') ? '' : '.'
                     let propertyName = `${this.constructor.name}${placement}${method}`
@@ -34,7 +34,7 @@ const createMarkerDecorator = name => createOptionalArgumentDecorator((decorated
                 })
             }
         })
-        
+
         return decorated
     } else {
         let placement = decorated.placement == 'static' ? '.' : '#'
@@ -89,8 +89,8 @@ const markStream = createMarkerDecorator('stream')
 
 const _session = (property) => {
     let original = property.descriptor.value
-    let newFunc = function(_, ...args){
-        return original.apply(this, args)      
+    let newFunc = function (_, ...args) {
+        return original.apply(this, args)
     }
     markSession(property)
     property.descriptor.value = function (...args) {
@@ -99,7 +99,7 @@ const _session = (property) => {
             throw new SessionRequest(session => {
                 let result = new Pipe([model, newFunc], session, ...args)
                 result.observe(emit)
-                result.catch( err =>  pipe.throwError(err))
+                result.catch(err => pipe.throwError(err))
             })
         })
         return pipe
@@ -117,7 +117,7 @@ const _stream = function (property) {
         }
     } else {
         let original = property.descriptor.value
-        let newFunc = function(_, ...args){
+        let newFunc = function (_, ...args) {
             return original.apply(this, args)
         }
         property.descriptor.value = function (...args) {
@@ -125,10 +125,10 @@ const _stream = function (property) {
         }
     }
     return value
-} 
+}
 
-const _validate = validator => function(decorated){
-    decorated.extras = [ 
+const _validate = validator => function (decorated) {
+    decorated.extras = [
         ...decorated.extras || [],
         {
             kind: "method",
@@ -149,6 +149,19 @@ const _validate = validator => function(decorated){
     return decorated
 }
 
+
+const _compose = function (...parents) {
+    return child => {
+        parents.forEach(parent => {
+            let methods = Object.getOwnPropertyNames(parent.prototype)
+            methods.forEach(method => {
+                child.prototype[method] = parent.prototype[method]
+            })
+        })
+        return child
+    }
+}
+
 export {
     _shared,
     _stream,
@@ -156,6 +169,7 @@ export {
     _authorize,
     _public,
     _validate,
+    _compose,
 
     markersFor,
     clearMarkers,
