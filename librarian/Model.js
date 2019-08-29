@@ -1,5 +1,5 @@
 import { DBConnection } from './DBConnection'
-import { _shared, _public, _stream, _authorize, _session, _validate  } from '../arbiter'
+import { _shared, _public, _stream, _authorize, _session, _validate, _compose  } from '../arbiter'
 import { datatypes } from './datatypes'
 import { toTableName, toCamelCase } from '../scribe'
 import { map, filter } from '../mason';
@@ -177,7 +177,7 @@ export class Model extends DBConnection {
     // -----------------------------------UTILS------------------------------------
 
 
-    static Decorators = { ...datatypes, _shared, _public, _stream, _authorize, _session, _validate }
+    static Decorators = { ...datatypes, _shared, _public, _stream, _authorize, _session, _validate, _compose }
 
     
     get persisted_fields(){
