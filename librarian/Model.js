@@ -1,5 +1,5 @@
 import { DBConnection } from './DBConnection'
-import { _shared, _public, _stream, _authorize, _session, _validate, _compose  } from '../arbiter'
+import { _shared, _public, _stream, _authorize, _session, _validate, _composes  } from '../arbiter'
 import { datatypes } from './datatypes'
 import { toTableName, toCamelCase } from '../scribe'
 import { map, filter } from '../mason';
@@ -177,7 +177,7 @@ export class Model extends DBConnection {
     // -----------------------------------UTILS------------------------------------
 
 
-    static Decorators = { ...datatypes, _shared, _public, _stream, _authorize, _session, _validate, _compose }
+    static Decorators = { ...datatypes, _shared, _public, _stream, _authorize, _session, _validate, _composes }
 
     
     get persisted_fields(){
@@ -197,6 +197,7 @@ export class Model extends DBConnection {
             enumerable: false,
             writable: true,
             value:  { 
+                ...this.fields,
                 id: { name: 'id', type: 'SERIAL', constraints: { primaryKey: true } },
                 last_updated: { name: 'last_updated', type: 'int8',  constraints: {} }
             }

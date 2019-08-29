@@ -112,6 +112,7 @@ const defaultFieldCreator = function (alias, property, type, typeModifier, const
         root.flags[propertyName] = root.flags[propertyName] || {}
         root.flags[columnName] = root.flags[propertyName]
         const defaults = property.initializer.call(this)
+        if(!this.fields) Object.defineProperty(this, 'fields', { enumerable: false, value: {} })
         this.fields[name] = ({ alias, name, type, typeModifier, defaults, constraints })
         return defaults
     }

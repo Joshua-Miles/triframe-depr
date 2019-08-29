@@ -1,9 +1,10 @@
 import { SessionRequest } from "./SessionRequest";
 import { Pipe } from "../herald";
+import { each } from "../mason";
 
 const root = {
     flags: new Object
-}
+} 
 
 const createOptionalArgumentDecorator = (decorator) => {
     return (...args) => {
@@ -150,12 +151,67 @@ const _validate = validator => function (decorated) {
 }
 
 
-const _compose = function (...parents) {
+const _composes = function (...parents) {
     return child => {
         parents.forEach(parent => {
-            let methods = Object.getOwnPropertyNames(parent.prototype)
-            methods.forEach(method => {
-                child.prototype[method] = parent.prototype[method]
+
+            let addElement = ( placement, name, descriptor ) => {
+                if(name == 'constructor' || typeof name == 'symbol') return
+                if(descriptor.value !== undefined && typeof descriptor.value !== 'function'){
+                    if(descriptor.enumerable == false) return
+                    let value = descriptor.value;
+                    delete descriptor.value
+                    child.elements.push({
+                        kind: 'field',
+                        key: name,
+                        placement: placement,
+                        descriptor: descriptor,
+                        initializer: () => value
+                    })
+                } else {
+                    child.elements.push({
+                        kind: 'method',
+                        key: name,
+                        placement: placement,
+                        descriptor: descriptor,
+                    })
+                }
+            }
+
+            let instance = new parent
+            let instanceMethods = {
+                ...Object.getOwnPropertyDescriptors(parent.prototype),
+                ...Object.getOwnPropertyDescriptors(instance)
+            }
+            each(instanceMethods, (name, descriptor) => addElement('own', name, descriptor))
+
+
+            let classMethods = Object.getOwnPropertyDescriptors(parent)
+            each(classMethods, (name, descriptor) => addElement('static', name, descriptor))
+
+
+            // Add hook to zip flags together
+            let temp = Symbol()
+            child.elements.push({
+                kind: "field",
+                key: temp,
+                placement: "own",
+                descriptor: {},
+                initializer() {
+                    delete this[temp]
+                    each(instanceMethods, (method) => {
+                        let propertyName = `${this.constructor.name}#${method}`
+                        let formerName = `${parent.name}#${method}`
+                        root.flags[propertyName] = root.flags[propertyName] || new Object
+                        Object.assign(root.flags[propertyName], root.flags[formerName])
+                    })
+                    each(classMethods, (method) => {
+                        let propertyName = `${this.constructor.name}.${method}`
+                        let formerName = `${parent.name}.${method}`
+                        root.flags[propertyName] = root.flags[propertyName] || new Object
+                        Object.assign(root.flags[propertyName], root.flags[formerName])
+                    })
+                }
             })
         })
         return child
@@ -169,7 +225,7 @@ export {
     _authorize,
     _public,
     _validate,
-    _compose,
+    _composes,
 
     markersFor,
     clearMarkers,
