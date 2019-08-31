@@ -1,62 +1,23 @@
-import React from 'react';
-import { ToggleButton, Chip, TextInput, HelperText, Button as NativePaperButton, Portal, Dialog, Paragraph, FAB, Card, Title, Appbar, List, Switch as ToggleSwitch, Caption, Subheading as Subtitle } from 'react-native-paper';
-import { View, Text, Platform, TextInput as TextField } from 'react-native'
-import { createGrid } from './Grid'
+// Native and Platform Components
+import { View, Platform } from 'react-native'
 import { Route, Switch, Redirect } from 'react-router'
 import { Router, Link } from './platform'
-import TextEditor from './TextEditor'
-import Container from './Container'
+
+// Native Paper Components
+import { Appbar } from 'react-native-paper';
+
+// 
 import { Provider, tether } from './Provider'
-import DrawerLayout from 'react-native-drawer-layout';
 
-const Headline = ({ children }) => (
-    <Text style={{ fontSize: 40 }}>
-        {children}
-    </Text>
-)
-
-// Subtitle
-// Text
-
-const Pressable = NativePaperButton
-
-const Button = ({ children, ...rest }) => (
-    <NativePaperButton style={{ padding: 5, margin: 5 }} mode="contained" {...rest}>{children}</NativePaperButton>
-)
-
-const Drawer = ({ children, render = () => null, getDrawer }) => {
-    let drawer;
-    let handleRef = (ref) => {
-        drawer = ref;
-        getDrawer(ref)
-    }
-    let closeDrawer = () => drawer.closeDrawer()
-    return (
-        <DrawerLayout
-            drawerWidth={300}
-            drawerLockMode={'unlocked'}
-            ref={handleRef}
-            keyboardDismissMode="on-drag"
-            renderNavigationView={() => render({ closeDrawer })}>
-            <View style={{ height: '100vh' }}>
-                {children}
-            </View>
-        </DrawerLayout>
-    )
-}
-
-function Modal(props){
-    const { children, ...rest} = props
-    return (
-        <Portal>
-            <Dialog {...rest}>
-                {children}
-            </Dialog>
-        </Portal>
-    )
-}
-
-Object.assign(Modal, Dialog)
+// Custom Components
+import TextEditor from './TextEditor'
+import Drawer from './Drawer'
+import Modal from './Modal'
+import { Card, Chip, List } from './Material'
+import { createGrid, Container, Section } from './Layout'
+import { Button, BubbleButton, ToggleButton } from './Button'
+import { Text, Title, Heading, Subheading, Paragraph, Caption } from './Typography'
+import { TextInput, TextField, HelperText, ToggleSwitch } from './Form'
 
 const { Grid, Column } = createGrid({
     xs: 0,
@@ -66,41 +27,32 @@ const { Grid, Column } = createGrid({
     xl: 950
 })
 
-
 export {
-    HelperText,
-    Drawer,
-    tether,
-    Subtitle,
-    ToggleButton,
-    Chip,
-    Route,
-    Router,
-    Link,
-    Switch,
-    TextInput,
-    Button,
-    View,
-    Pressable,
-    Portal,
-    Dialog,
-    Paragraph,
-    FAB,
-    Provider,
-    Text,
-    Platform,
-    Card,
-    Container,
+
+    // Deprecate
     TextEditor,
-    TextField,
-    Title,
-    Grid,
-    Column,
-    Redirect,
-    Appbar,
-    List,
-    ToggleSwitch,
-    Caption,
-    Headline,
-    Modal
+
+    // Low Level
+    Platform, Provider, tether,
+
+    // Routing
+    Router, Route, Redirect, Link, Switch,
+
+    // Layout
+    View, Container, Section, Grid, Column, 
+
+    // Common
+    Drawer, Modal, Appbar,
+
+    // Typography
+    Text, Title, Heading, Subheading, Paragraph, Caption,
+
+    // Buttons
+    Button, BubbleButton, ToggleButton,
+
+    // Form
+    TextInput, TextField, HelperText, ToggleSwitch,
+
+    // Material
+    Chip, Card, List,
 }

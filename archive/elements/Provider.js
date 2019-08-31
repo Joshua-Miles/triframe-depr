@@ -1,5 +1,5 @@
 import socketIo from 'socket.io-client';
-import { UnSerializer } from 'triframe/arbiter/UnSerializer';
+import { UnSerializer } from '../arbiter/UnSerializer';
 import React, { useState, useEffect } from 'react';
 import { withRouter } from 'react-router'
 import { Pipe, EventEmitter } from '../herald';
@@ -143,7 +143,7 @@ const createUseContext = models => context => {
 export const tether = Component => props => {
     return (
         <Model.Consumer>
-            {models => <ConnectedComponent props={props} models={models} Component={Component} />}
+            {models => <ConnectedComponent props={props} models={models} Component={Component} history={history} />}
         </Model.Consumer>
     )
 }
