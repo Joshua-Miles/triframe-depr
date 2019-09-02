@@ -45,7 +45,7 @@ program
         switch(type){
             case 'model':
                 let decorators = { _public: true }
-                var [ name, path, ...instructions] = args;
+                var [ path, name, ...instructions] = args;
                 let definition = instructions.reduce( ( definition, part, index ) => {
                     if(part.includes('=')){
                         let [ name, defaults = "" ] = part.split('=')
@@ -75,7 +75,7 @@ export class ${name} extends Model {
             case 'form':
                     let inputs = {}
                     let defaults = ''
-                    var [ name, path, ...instructions] = args;
+                    var [ path, name, ...instructions] = args;
                     var [ Name, Model = name ] = name.split(':')
                     let fields = instructions.reduce( ( fields, part, index ) => {
                         let [ something, Input = 'TextInput' ] = part.split(':')
@@ -115,7 +115,7 @@ export default tether(${Name})`
                     fs.writeFile(`./src/${path}.js`, code)
                 break;
                 case 'view':
-                    var [ Name, path ] = args;
+                    var [ path, name ] = args;
                     var code= `import React from 'react'
 import { tether, Container, Heading } from 'triframe/designer'
 
