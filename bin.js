@@ -70,7 +70,7 @@ export class ${name} extends Model {
     ${definition}
 }`
             
-                fs.writeFile(`${path}.js`, code)
+                fs.writeFile(`./src/${path}.js`, code)
             break;
             case 'form':
                     let inputs = {}
@@ -112,7 +112,7 @@ function* ${Name}({ use, models }) {
 
 export default tether(${Name})`
                 
-                    fs.writeFile(`${path}.js`, code)
+                    fs.writeFile(`./src/${path}.js`, code)
                 break;
                 case 'view':
                     var [ Name, path ] = args;
@@ -129,7 +129,7 @@ function* ${Name}({ use, useContext, models, history }) {
 
 export default tether(${Name})`
                 
-                    fs.writeFile(`${path}.js`, code)
+                    fs.writeFile(`./src/${path}.js`, code)
                 break;
         }
     })
