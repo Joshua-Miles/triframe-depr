@@ -8,5 +8,8 @@ const ToggleSwitch = ({ onPress, ...props}) => (
     <Switch onValueChange={onPress} {...props} />
 )
 
+const PasswordInput = (props) => (
+    <TextInput secureTextEntry={true} {...props} />
+)
 
-export { TextField, TextInput, HelperText, ToggleSwitch }
+export { TextField, TextInput, PasswordInput, HelperText, ToggleSwitch }

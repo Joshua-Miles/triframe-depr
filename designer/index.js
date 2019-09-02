@@ -15,9 +15,9 @@ import Drawer from './Drawer'
 import Modal from './Modal'
 import { Card, Chip, List } from './Material'
 import { createGrid, Container, Section } from './Layout'
-import { Button, BubbleButton, ToggleButton } from './Button'
+import { Button, BubbleButton, ToggleButton, FileInput } from './Button'
 import { Text, Title, Heading, Subheading, Paragraph, Caption } from './Typography'
-import { TextInput, TextField, HelperText, ToggleSwitch } from './Form'
+import { TextInput, PasswordInput, TextField, HelperText, ToggleSwitch } from './Form'
 
 const { Grid, Column } = createGrid({
     xs: 0,
@@ -51,7 +51,7 @@ export {
     Button, BubbleButton, ToggleButton,
 
     // Form
-    TextInput, TextField, HelperText, ToggleSwitch,
+    TextInput, PasswordInput, FileInput, TextField, HelperText, ToggleSwitch,
 
     // Material
     Chip, Card, List,

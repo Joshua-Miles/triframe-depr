@@ -1,11 +1,23 @@
 import { Serializer, UnSerializer } from './arbiter'
 import { Model } from './librarian';
 import fs from 'fs'
+import mime from 'mime';
+
+const formidable  = require('formidable')
+const http  = require('http')
+
 const socketIo = require('socket.io')
 
 const SESSIONS_PATH = './.sessions';
+
+const UPLOADS_PATH = './.uploads'
+
 if (!fs.existsSync(SESSIONS_PATH)){
     fs.mkdirSync(SESSIONS_PATH);
+}
+
+if (!fs.existsSync(UPLOADS_PATH)){
+    fs.mkdirSync(UPLOADS_PATH);
 }
 
 function loadModels(r) { 
@@ -48,6 +60,7 @@ export default class Server {
                 this.saveSession(token, session)
             });
         })
+        this.listenForFileUploads()
     }
 
 
@@ -65,7 +78,7 @@ export default class Server {
             session = {}
         }
         
-        let token = this.createSessionToken()
+        let token = this.createToken()
         this.saveSession(token, session)
         session.destroy = function(){
             Object.keys(session).forEach(key => {
@@ -81,7 +94,7 @@ export default class Server {
         fs.writeFileSync(`${SESSIONS_PATH}/${token}.json`, JSON.stringify(this.serializer.serializeDocument(sessionData)))
     }
 
-    createSessionToken() {
+    createToken() {
         var result           = '';
         var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
         var charactersLength = characters.length;
@@ -89,6 +102,50 @@ export default class Server {
            result += characters.charAt(Math.floor(Math.random() * charactersLength));
         }
         return result;
+     }
+
+
+     listenForFileUploads(){
+        http.createServer((req, res) => {
+            if (req.url == '/upload' && req.method.toLowerCase() == 'post') {
+                const form = new formidable.IncomingForm();
+                const urls = []
+                form.parse(req, (err, fields, files) => {
+                    let form = { ...fields, ...files } 
+                    for(let index = 0; index < form.length; index++){
+                        const file = form[index]
+                        const extension = file.name.split('.').pop()
+                        const filepath = `${this.createToken()}.${extension}`
+                        urls.push(`/cdn/${filepath}`)
+                        fs.rename(file.path, `${UPLOADS_PATH}/${filepath}`, function (err) {
+                            if (err) throw err;
+                        });
+                    }
+                    res.writeHead(200, {'content-type': 'text/plain', 'Access-Control-Allow-Origin': '*'});
+                    res.end(JSON.stringify(urls));
+                });
+           
+              return;
+            }
+
+            if(req.url.startsWith('/cdn')){
+                const path = req.url.replace('/cdn', `${UPLOADS_PATH}/`)
+                const extension = path.split('.').pop()
+                const stat = fs.statSync(path);
+                const mimeType = mime.getType(extension); 
+                console.log(stat, mimeType)
+            
+                res.writeHead(200, {
+                    'Content-Type': mimeType,
+                    'Content-Length': stat.size
+                });
+            
+                const readStream = fs.createReadStream(path);
+                // We replaced all the event handlers with a simple call to readStream.pipe()
+                readStream.pipe(res);
+            }
+                
+          }).listen(8081);
      }
 
 }

@@ -27,7 +27,7 @@ program
                 await fs.writeFile(`${name}/package.json`, JSON.stringify(loadPackageConfig(name), null, 2))
                 await exec(`cd "${name}" && npm install && npm link triframe`)
                 progress.update(75)
-                    ;['web', 'src', 'webpack.config.js', 'index.js', 'server.js', '.eslintrc.js'].forEach(async folder => {
+                    ;['web', 'src', 'webpack.config.js', 'index.js', 'server.js', '.eslintrc.js', '.gitignore'].forEach(async folder => {
                         let source = path.join(__dirname, '_lib', folder)
                         let destination = path.join(process.cwd(), name, folder)
                         await new Promise(resolve => ncp(source, destination, resolve))
@@ -37,6 +37,103 @@ program
                 console.log('Install Completed')
             })
     })
+
+
+program
+    .command('build type [args...]')
+    .action( ([ type, ...args])  => {
+        switch(type){
+            case 'model':
+                let decorators = { _public: true }
+                var [ name, path, ...instructions] = args;
+                let definition = instructions.reduce( ( definition, part, index ) => {
+                    if(part.includes('=')){
+                        let [ name, defaults = "" ] = part.split('=')
+                        try {
+                            JSON.parse(defaults)
+                        } catch {
+                            defaults = `"${defaults}"`
+                        }
+                        definition =  `${definition}\n  ${name} = ${defaults}\n`
+                    } else {
+                        let decorator = part
+                        decorators[decorator] = true;
+                        definition = ` ${definition}\n  @${decorator}`
+                    }
+                    return definition
+                }, '')
+                var code= `import { Model } from 'triframe/librarian'
+const { ${Object.keys(decorators).join(', ')} } = Model.Decorators
+
+@_public('find', 'where', 'search', 'create', 'destroyAll', '#commit', '#destroy')
+export class ${name} extends Model {
+    ${definition}
+}`
+            
+                fs.writeFile(`${path}.js`, code)
+            break;
+            case 'form':
+                    let inputs = {}
+                    let defaults = ''
+                    var [ name, path, ...instructions] = args;
+                    var [ Name, Model = name ] = name.split(':')
+                    let fields = instructions.reduce( ( fields, part, index ) => {
+                        let [ something, Input = 'TextInput' ] = part.split(':')
+                        var [ label, defaultValue = '""' ] = something.split('=')
+                        inputs[Input] = true
+                        let name = toCamelCase(label)
+                        defaults= `${defaults}\n        ${name}: ${defaultValue},`
+                        fields = `${fields}
+            <${Input}
+                label="${label}"
+                value={form.${name}}
+                onChangeText={${name} => form.set({ ${name} })}
+            />
+            <HelperText visible={!form.isValid('${name}')} type="error">
+                {form.errorsFor('${name}')}
+            </HelperText>`
+                        return fields
+                    }, '')
+                    var code= `import React from 'react'
+import { tether, Container, Button, HelperText, ${Object.keys(inputs).join(', ')} } from 'triframe/designer'
+
+function* ${Name}({ use, models }) {
+    const { ${Model} } = models
+    const form = yield use(new ${Model}({${defaults}
+    }))
+    return (
+        <Container>${fields}
+            <Button onPress={console.log}>
+                Submit
+            </Button>
+        </Container>
+    )
+}
+
+export default tether(${Name})`
+                
+                    fs.writeFile(`${path}.js`, code)
+                break;
+                case 'view':
+                    var [ Name, path ] = args;
+                    var code= `import React from 'react'
+import { tether, Container, Heading } from 'triframe/designer'
+
+function* ${Name}({ use, useContext, models, history }) {
+    return (
+        <Container>
+            <Heading>${Name}</Heading>
+        </Container>
+    )
+}
+
+export default tether(${Name})`
+                
+                    fs.writeFile(`${path}.js`, code)
+                break;
+        }
+    })
+
 
 
 const loadPackageConfig = name => ({
@@ -67,6 +164,7 @@ const loadPackageConfig = name => ({
         "concurrently": "^4.1.1",
         "css-loader": "1.0.0",
         "dotenv": "6.0.0",
+        "formidable": "^1.2.1",
         "dotenv-expand": "4.2.0",
         "eslint": "5.6.0",
         "eslint-config-react-app": "^3.0.6",
@@ -190,3 +288,14 @@ process.on('SIGINT', function () {
 });
 
 program.parse(process.argv)
+
+
+function toCamelCase(str, upper) {
+	str = str.toLowerCase();
+	var parts = str.split(/[\s_]+/g);
+	for (var i = upper === true ? 0 : 1, ii = parts.length; i < ii; ++i) {
+		var part = parts[i];
+		parts[i] = part.charAt(0).toUpperCase() + part.substr(1);
+	}
+	return parts.join('');
+};
