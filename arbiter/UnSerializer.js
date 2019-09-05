@@ -134,9 +134,9 @@ export class UnSerializer {
 
                 const handleResponse = function (response) {
                     if (response && response.error) {
-                        throw Error(response.message)
+                        emit.throwError(response.message)
                     }
-                    if (serializedResult === PENDING_VALUE) {
+                    if (serializedResult === PENDING_VALUE || !serializedResult) {
                         devtools.initial(response)
                         serializedResult = response
                         emitDocument()
@@ -244,11 +244,6 @@ export class UnSerializer {
                 resultSnapshot = snapshot(this)
                 let adjustedPatches = patches.map( patch => ({ ...patch, path: `${path}${patch.path}`}))
                 callback(adjustedPatches)
-            }
-        })
-        Object.defineProperty(result, 'addProperty', {
-            value: function(key, value){
-                this[key] = serializer.unSerializeDocument(value, callback, `${path}/${key}`)
             }
         })
         Object.defineProperty(result, 'patches', { value: [] })

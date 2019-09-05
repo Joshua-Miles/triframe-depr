@@ -1,5 +1,5 @@
 import { DBConnection } from './DBConnection'
-import { _shared, _public, _stream, _authorize, _session, _validate, _composes  } from '../arbiter'
+import { _shared, _public, _stream, _authorize, _session, _validate, _composes } from '../arbiter'
 import { datatypes } from './datatypes'
 import { toTableName, toCamelCase } from '../scribe'
 import { map, filter } from '../mason';
@@ -15,19 +15,19 @@ export class Model extends DBConnection {
 
     // ------------------------- CLASS METHODS ----------------------------------
 
-    static get tableName(){
+    static get tableName() {
         return toTableName(this.name)
     }
 
     @_shared
-    static get all(){
+    static get all() {
         return this.where({})
     }
 
     @_stream
-    static  * find(id){
+    static * find(id) {
         yield this.nowAndOn(`${id}`)
-        let results = yield this.query( ({ sql, self }) => (sql`
+        let results = yield this.query(({ sql, self }) => (sql`
             SELECT ${self('*')} FROM ${self}
             WHERE id=${id}
         `))
@@ -35,14 +35,14 @@ export class Model extends DBConnection {
     }
 
     @_stream
-    static *where(attributes){
+    static *where(attributes) {
         yield this.nowAndOn('*')
-        return this.query( ({ sql, self, each }) => sql`
+        return this.query(({ sql, self, each }) => sql`
             SELECT ${self('*')} FROM ${self}
             WHERE ${
-                Object.keys(attributes).length > 0 ?
-                each(attributes, (key, value) => 
-                `${key}=${value}`, 'AND'
+            Object.keys(attributes).length > 0 ?
+                each(attributes, (key, value) =>
+                    `${key}=${value}`, 'AND'
                 ) :
                 1
             }
@@ -50,71 +50,83 @@ export class Model extends DBConnection {
     }
 
     @_stream
-    static *search(attributes){
+    static *search(attributes) {
         yield this.nowAndOn('*')
-        return this.query( ({ sql, self, each }) => sql`
+        return this.query(({ sql, self, each }) => sql`
             SELECT ${self('*')} FROM ${self}
-            WHERE ${each(attributes, (key, value) => 
-                `${key} LIKE ${value}`, 'OR'
-            )}
-        `)
+            WHERE ${each(attributes, (key, value) =>
+            `${key} LIKE ${value}`, 'OR'
+        )}`)
     }
 
-    static async destroyAll(){
-        let result = await this.query( ({ sql, self }) => (sql`
+    static async destroyAll() {
+        let result = await this.query(({ sql, self }) => (sql`
             DELETE FROM ${self};
         `))
         this.emit('*')
         return result
     }
 
-    static async create(attributes){
-        let result = await this.query( ({ sql, self, keysOf, valuesOf }) => (sql`
-            INSERT INTO ${self} (${keysOf(attributes)}) VALUES (${valuesOf(attributes)})
-            RETURNING id
-        `))
-        this.emit('*')
-        return result
+    static async create(attributes) {
+        let record = this.new(attributes);
+        return record.commit()
+    }
+
+    @_shared
+    static new(attributes) {
+        let record = new this;
+        Object.assign(record, attributes)
+        return record
     }
 
     // ----------------------- INSTANCE METHODS ----------------------------------
 
     @_shared
-    set(attributes){
+    set(attributes) {
         Object.assign(this, attributes)
         this._onChange()
     }
 
 
     @_shared
-    save(){
+    save() {
         this._onChange()
         return this.commit()
     }
 
     @_shared
-    update(attributes){
+    update(attributes) {
         this.set(attributes)
         return this.commit()
     }
 
-    async commit(){
+    async commit() {
         const { attributes } = this;
-        console.log(attributes)
-        delete attributes.id
-        let result = await this.query( ({ sql, self, each }) => sql`
-            UPDATE ${self} 
-            SET ${each(attributes, (key, value) => 
-                `${key}=${value}`
-            )}
-            WHERE id=${this.id}
-        `)
-        this.emit(`${this.id}`)
+        let result;
+        if (attributes.id) {
+            console.log(attributes)
+            delete attributes.id
+            result = await this.query(({ sql, self, each }) => sql`
+                UPDATE ${self} 
+                SET ${each(attributes, (key, value) =>
+                    `${key}=${value}`
+                )}
+                WHERE id=${this.id}
+            `)
+            this.emit(`${this.id}`)
+        } else {
+            delete attributes.id
+            result = await this.query(({ sql, self, keysOf, valuesOf }) => (sql`
+                INSERT INTO ${self} (${keysOf(attributes)}) VALUES (${valuesOf(attributes)})
+                RETURNING id
+            `))
+            this.emit('*')
+        }
         return result
     }
 
-    async destroy(){
-        let result = await this.query( ({ sql, self }) => sql`
+    async destroy() {
+        let result = await this.query(({ sql, self }) => sql`
             DELETE FROM ${self}
             WHERE id=${this.id}
         `)
@@ -125,50 +137,50 @@ export class Model extends DBConnection {
 
     // --------------------------------VALIDATION ENGINE -------------------------------
     @_shared
-    isValid(field){
+    isValid(field) {
         return this.errorsFor(field).length == 0
     }
 
     @_shared
-    errorsFor(field){
+    errorsFor(field) {
         let Model = this.constructor
         let validator = Model[`validate_${field}`]
-        if(!validator) return [];
+        if (!validator) return [];
         let errors = []
         let func = validator(this[field], this)
         let iterator = func.next()
-        while(!iterator.done) {
+        while (!iterator.done) {
             errors.push(iterator.value)
             iterator = func.next()
         }
         return errors
     }
 
-    
+
 
     // --------------------------------EVENT ENGINE -------------------------------
 
-    static on(...args){
+    static on(...args) {
         return this.events.on(...args)
     }
 
-    static emit(...args){
+    static emit(...args) {
         return this.events.emit(...args)
     }
 
-    static nowAndOn(...args){
+    static nowAndOn(...args) {
         return this.events.nowAndOn(...args)
     }
 
-    on(...args){
+    on(...args) {
         return this.events.on(...args)
     }
 
-    emit(...args){
+    emit(...args) {
         return this.events.emit(...args)
     }
 
-    nowAndOn(...args){
+    nowAndOn(...args) {
         return this.events.nowAndOn(...args)
     }
 
@@ -179,27 +191,27 @@ export class Model extends DBConnection {
 
     static Decorators = { ...datatypes, _shared, _public, _stream, _authorize, _session, _validate, _composes }
 
-    
-    get persisted_fields(){
+
+    get persisted_fields() {
         return filter(this.fields, (name, field) => field.type !== 'virtual')
     }
 
-    get attributes(){
+    get attributes() {
         return map(this.persisted_fields, name => this[toCamelCase(name)])
     }
 
-    _onChange(){}
+    _onChange() { }
 
 
-    constructor(){
+    constructor() {
         super()
         Object.defineProperty(this, 'fields', {
             enumerable: false,
             writable: true,
-            value:  { 
+            value: {
                 ...this.fields,
                 id: { name: 'id', type: 'SERIAL', constraints: { primaryKey: true } },
-                last_updated: { name: 'last_updated', type: 'int8',  constraints: {} }
+                last_updated: { name: 'last_updated', type: 'int8', constraints: {} }
             }
         })
 
@@ -227,7 +239,7 @@ Object.defineProperty(Model, 'global', {
 
 Object.defineProperty(Model, 'events', {
     enumerable: false,
-    get: function(){
+    get: function () {
         return agent.of(this.name)
     }
 })

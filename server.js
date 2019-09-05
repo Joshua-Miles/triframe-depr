@@ -45,7 +45,7 @@ export default class Server {
         const serializer = this.serializer = new Serializer(types)
         const unserializer = this.unserializer = new UnSerializer(serializer.interface)
         this.io.on('connection', socket => {
-            const { session, token } = this.loadSession(socket.handshake.query.token)
+            const { session, token } = this.loadSession(socket.handshake.query.token, socket.id)
             socket.emit('token', token)
             socket.emit('interface', serializer.interface)
             socket.on('message', ( { action, payload, id }, respond) => {
@@ -64,7 +64,7 @@ export default class Server {
     }
 
 
-    loadSession(oldToken){
+    loadSession(oldToken, id){
         let session;
         if(oldToken && fs.existsSync(`${SESSIONS_PATH}/${oldToken}.json`)){
             try {
@@ -72,10 +72,10 @@ export default class Server {
                 fs.unlinkSync(`${SESSIONS_PATH}/${oldToken}.json`)
             } catch(err){
                 console.log(err)
-                session = {} 
+                session = { id } 
             }
         } else {
-            session = {}
+            session = { id }
         }
         
         let token = this.createToken()

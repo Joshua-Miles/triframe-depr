@@ -4,30 +4,28 @@ import { each } from "triframe/mason";
 import { Text } from '.'
 
 
-let renderChildren = children => (
-    children && typeof children.map == 'function'
-    ? children.map(renderChildren)
-    : (
-        typeof children === 'string'
-        ? <Text>{children}</Text>
-        : children
-    )
-)
-
 export const Container = ({ children }) => (
     <View style={{ margin: 50}}>
         {renderChildren(children)}
     </View>
 )
 
-export const Section = ({ children, row, center, style }) => (
+export const Section = ({ children, inline, style }) => (
     <View style={{ 
         marginTop: 15, 
         marginBottom: 15,
-        flexDirection: row ? 'row' : undefined,
-        flexWrap: row ? 'wrap' : undefined,
-        alignItems: center ? 'center' : undefined,
         ...style
+    }}>
+        {renderChildren(children)}
+    </View>
+)
+
+export const Area = ({ children, inline= false, alignX = 'left', alignY = 'left' }) => (
+    <View style={{
+        justifyContent: inline ? alignmentMap[alignX] :  alignmentMap[alignY],
+        alignItems:  inline ? alignmentMap[alignY] : alignmentMap[alignX],
+        flexDirection: inline ? 'row' : 'column',
+        flex: 1
     }}>
         {renderChildren(children)}
     </View>
@@ -57,7 +55,7 @@ export const createGrid = sizes => {
     
         const { width, height } = useScreenSize(props)
 
-        const { right, inline } = props
+        const { right, center, inline } = props
 
         let size = 1
         each(sizes, ( currentSize, threshold) => {
@@ -86,14 +84,7 @@ export const createGrid = sizes => {
             break;
         }
 
-        if(inline){
-            styles.flexDirection='row'
-        }
-
-        if(right){
-            if(inline) styles.justifyContent= 'flex-end'
-            else styles.alignItems = 'flex-end'
-        }
+      
         return (
             <View style={styles} >
                 {renderChildren(props.children)}
@@ -125,8 +116,21 @@ const useScreenSize = (props) => {
     return sizes
 }
 
-const stylesheet = StyleSheet.create({
-    inline: {
-        flexDirection: 'row'
-    }
-})
+let renderChildren = children => (
+    children && typeof children.map == 'function'
+    ? children.map(renderChildren)
+    : (
+        typeof children === 'string'
+        ? <Text>{children}</Text>
+        : children
+    )
+)
+
+const alignmentMap = {
+    left: 'flex-start',
+    right: 'flex-end',
+    top: 'flex-start',
+    bottom: 'flex-end',
+    center: 'center',
+    justify: 'space-between'
+}

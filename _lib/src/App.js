@@ -1,13 +1,10 @@
 import React from 'react'
 import {
 
-  Provider, tether,
-
-  // Routing
-  Router, Route, Redirect, Link, Switch,
+  tether,
 
   // Layout
-  Container, Section, Grid, Column,
+  Container, Grid, Column, Section, Area,
 
   // Common
   Drawer, Modal, Appbar,
@@ -16,7 +13,7 @@ import {
   Text, Title, Heading, Subheading, Paragraph, Caption,
 
   // Buttons
-  Button, BubbleButton, ToggleButton,
+  Button, BubbleButton, ToggleButton, FileInput,
 
   // Form
   TextInput, TextField, HelperText, ToggleSwitch,
@@ -25,6 +22,8 @@ import {
   Chip, Card, List,
 
 } from 'triframe/designer'
+
+
 
 function* App({ models, history, props, use, useContext }) {
   let state = yield use({
@@ -53,6 +52,10 @@ function* App({ models, history, props, use, useContext }) {
         <Section>
           <Heading>TextInput</Heading>
           <TextInput label="Text Input" />
+        </Section>
+        <Section>
+          <Heading>FileInput</Heading>
+          <FileInput icon="cloud-upload" multiple onChange={console.log} label="Text Input" />
         </Section>
         <Section>
           <Heading>HelperText</Heading>
@@ -91,11 +94,11 @@ function* App({ models, history, props, use, useContext }) {
         </Section>
         <Section>
           <Heading>Button</Heading>
-          <Section row>
+          <Area inline>
             <Button>Contained Button</Button>
             <Button mode="text">Text Button</Button>
             <Button mode="outlined">Outlined Button</Button>
-          </Section>
+          </Area>
         </Section>
         <Section>
           <Heading>BubbleButton</Heading>
@@ -141,11 +144,11 @@ function* App({ models, history, props, use, useContext }) {
         </Section>
         <Section>
           <Heading>Modal</Heading>
-          <Section center>
+          <Area alignX="center">
             <Button onPress={() => {
               state.set({ modal: true })
             }} mode="outlined">Open Modal</Button>
-          </Section>
+          </Area>
           <Modal visible={state.modal} onDismiss={() => state.set({ modal: false })}>
             <Modal.Content>
               <Text>Hi</Text>
@@ -154,16 +157,20 @@ function* App({ models, history, props, use, useContext }) {
         </Section>
         <Section>
           <Heading>Drawer</Heading>
-          <Section center>
+          <Area alignX="center">
             <Button onPress={() => {
               state.set({ drawer: true })
             }} mode="outlined">Open Drawer</Button>
-          </Section>
+          </Area>
         </Section>
       </Container>
     </Drawer>
   )
 }
+
+
+export default tether(Demo)
+ 
 
 
 const TetheredApp = tether(App)

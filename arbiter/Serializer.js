@@ -151,7 +151,7 @@ export class Serializer {
                         let emitUpdate = newDocument => {
                             document = newDocument
                             let newSerialized = this.serializeDocument(newDocument, session)
-                            if(newSerialized){
+                            if(newSerialized && serialized){
                                 let patch = jsonpatch.compare(serialized, newSerialized)
                                 emit(patch)
                             } else {

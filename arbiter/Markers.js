@@ -189,7 +189,6 @@ const _composes = function (...parents) {
             let classMethods = Object.getOwnPropertyDescriptors(parent)
             each(classMethods, (name, descriptor) => addElement('static', name, descriptor))
 
-
             // Add hook to zip flags together
             let temp = Symbol()
             child.elements.push({
@@ -198,6 +197,7 @@ const _composes = function (...parents) {
                 placement: "own",
                 descriptor: {},
                 initializer() {
+                    this.fields = { ...this.fields, ...instance.fields}
                     delete this[temp]
                     each(instanceMethods, (method) => {
                         let propertyName = `${this.constructor.name}#${method}`
@@ -214,6 +214,7 @@ const _composes = function (...parents) {
                 }
             })
         })
+
         return child
     }
 }

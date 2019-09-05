@@ -20,6 +20,7 @@ export class Pipe {
         setTimeout(() => {
             if (!this.alreadyInitialized && !this.isCanceled) this[execute]()
         })
+        this.emit.throwError = this.throwError
     }
 
     observe(callback) {

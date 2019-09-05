@@ -97,7 +97,7 @@ export class ${name} extends Model {
                     var code= `import React from 'react'
 import { tether, Container, Button, HelperText, ${Object.keys(inputs).join(', ')} } from 'triframe/designer'
 
-function* ${Name}({ use, models }) {
+const ${Name} = tether(function*({ use, models }) {
     const { ${Model} } = models
     const form = yield use(new ${Model}({${defaults}
     }))
@@ -108,26 +108,26 @@ function* ${Name}({ use, models }) {
             </Button>
         </Container>
     )
-}
+})
 
-export default tether(${Name})`
+export { ${Name} }`
                 
                     fs.writeFile(`./src/${path}.js`, code)
                 break;
                 case 'view':
-                    var [ path, name ] = args;
+                    var [ path, Name ] = args;
                     var code= `import React from 'react'
-import { tether, Container, Heading } from 'triframe/designer'
+import { tether, Container, Title } from 'triframe/designer'
 
-function* ${Name}({ use, useContext, models, history }) {
+const ${Name} = tether(function*({ use, useContext, models, history }) {
     return (
         <Container>
-            <Heading>${Name}</Heading>
+            <Title>${Name}</Title>
         </Container>
     )
-}
+})
 
-export default tether(${Name})`
+export { ${Name} }`
                 
                     fs.writeFile(`./src/${path}.js`, code)
                 break;

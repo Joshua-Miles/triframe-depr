@@ -36,16 +36,17 @@ export async function query(callback) {
             },
 
             keysOf: (attributes) => {
-                return createLiteral(Object.keys(attributes).map(toUnderscored).join(','))
+                return createLiteral(Object.keys(filter(attributes, (key, value) => value !== undefined )).map(toUnderscored).join(','))
             },
 
             valuesOf: (attributes) => {
-                return createLiteral(Object.values(attributes).map(escape).join(','))
+                return createLiteral(Object.values(filter(attributes, (key, value) => value !== undefined )).map(escape).join(','))
             },
 
             each: (attributes, callback, seperator = ',') => {
                 let result = ''
                 each(attributes, (key, value) => {
+                    if(value == undefined) return
                     key = toUnderscored(key)
                     value = escape(value)
                     result = result ? `${result} ${seperator} ${callback(key, value)}` : callback(key, value)

@@ -4,7 +4,7 @@ import { Route, Switch, Redirect } from 'react-router'
 import { Router, Link } from './platform'
 
 // Native Paper Components
-import { Appbar } from 'react-native-paper';
+import { Appbar, Avatar, Menu, Divider } from 'react-native-paper';
 
 // 
 import { Provider, tether } from './Provider'
@@ -14,7 +14,7 @@ import TextEditor from './TextEditor'
 import Drawer from './Drawer'
 import Modal from './Modal'
 import { Card, Chip, List } from './Material'
-import { createGrid, Container, Section } from './Layout'
+import { createGrid, Container, Section, Area } from './Layout'
 import { Button, BubbleButton, ToggleButton, FileInput } from './Button'
 import { Text, Title, Heading, Subheading, Paragraph, Caption } from './Typography'
 import { TextInput, PasswordInput, TextField, HelperText, ToggleSwitch } from './Form'
@@ -39,10 +39,10 @@ export {
     Router, Route, Redirect, Link, Switch,
 
     // Layout
-    View, Container, Section, Grid, Column, 
+    View, Container, Section, Area, Grid, Column, Divider,
 
     // Common
-    Drawer, Modal, Appbar,
+    Drawer, Modal, Appbar, Avatar, Menu,
 
     // Typography
     Text, Title, Heading, Subheading, Paragraph, Caption,

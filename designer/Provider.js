@@ -87,7 +87,8 @@ let createUse = () => {
                     value: function (attributes) {
                         Object.assign(this, attributes)
                         crawl(this, monitor)
-                        agent.emit(`update.${index}`)
+                        if(this._onChange) this._onChange()
+                        else agent.emit(`update.${index}`)
                     }
                 })
             }
@@ -162,8 +163,9 @@ let ConnectedComponent = withRouter(({ props = [], models, Component, history, m
 
             let [use, restartUse] = createUse()
             let useContext = createUseContext(models)
-
-            let payload = { models, props, whileLoading, useContext, use, history, match, location }
+            let useHistory = new Pipe( () => ({ history, match, location }) )
+            let redirect = path => history.push(path)
+            let payload = { models, props, whileLoading, useContext, useHistory, use, redirect }
             pipe = new Pipe(() => Component(payload), payload)
             pipe.observe(jsx => {
                 restartUse()
