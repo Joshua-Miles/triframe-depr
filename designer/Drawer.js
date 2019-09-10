@@ -1,7 +1,5 @@
 import React, { useEffect } from 'react';
-import { ScrollView } from 'react-native'
 import DrawerLayout from 'react-native-drawer-layout';
-import { View } from '.'
 
 export default ({ children, open, render = () => null, onClose }) => {
     let drawer;
@@ -20,11 +18,7 @@ export default ({ children, open, render = () => null, onClose }) => {
             keyboardDismissMode="on-drag"
             ref={ x => drawer = x }
             renderNavigationView={() => render({ closeDrawer })}>
-            <View style={{ height: '100vh' }}>
-                <ScrollView>
-                    {children}
-                </ScrollView>
-            </View>
+            {children}
         </DrawerLayout>
     )
 }

@@ -15,6 +15,8 @@ export class Model extends DBConnection {
 
     // ------------------------- CLASS METHODS ----------------------------------
 
+    static models = {}
+
     static get tableName() {
         return toTableName(this.name)
     }
@@ -36,13 +38,16 @@ export class Model extends DBConnection {
 
     @_stream
     static *where(attributes) {
+        console.log(attributes)
         yield this.nowAndOn('*')
         return this.query(({ sql, self, each }) => sql`
             SELECT ${self('*')} FROM ${self}
             WHERE ${
             Object.keys(attributes).length > 0 ?
                 each(attributes, (key, value) =>
-                    `${key}=${value}`, 'AND'
+                    Array.isArray(value)
+                        ? `${key} IN (${value.join(', ')})`
+                        : `${key}=${value}`, 'AND'
                 ) :
                 1
             }
@@ -102,27 +107,25 @@ export class Model extends DBConnection {
 
     async commit() {
         const { attributes } = this;
-        let result;
         if (attributes.id) {
-            console.log(attributes)
             delete attributes.id
-            result = await this.query(({ sql, self, each }) => sql`
+            await this.query(({ sql, self, each }) => sql`
                 UPDATE ${self} 
                 SET ${each(attributes, (key, value) =>
-                    `${key}=${value}`
+                    `"${key}"=${value}`
                 )}
                 WHERE id=${this.id}
             `)
-            this.emit(`${this.id}`)
+            await this.emit(`${this.id}`)
         } else {
             delete attributes.id
-            result = await this.query(({ sql, self, keysOf, valuesOf }) => (sql`
+            this.id = await this.query(({ sql, self, keysOf, valuesOf }) => (sql`
                 INSERT INTO ${self} (${keysOf(attributes)}) VALUES (${valuesOf(attributes)})
                 RETURNING id
             `))
-            this.emit('*')
+            await this.emit('*')
         }
-        return result
+        return this
     }
 
     async destroy() {
@@ -205,6 +208,7 @@ export class Model extends DBConnection {
 
     constructor() {
         super()
+        this.constructor.models[this.constructor.tableName] = this.constructor
         Object.defineProperty(this, 'fields', {
             enumerable: false,
             writable: true,

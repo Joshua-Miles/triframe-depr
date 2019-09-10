@@ -1,4 +1,4 @@
-import { toColumnName, toForeignKeyName, toCamelCase } from '../scribe'
+import { toColumnName, toForeignKeyName, toCamelCase, toSingular } from '../scribe'
 import { map } from '../mason'
 import { root } from '../arbiter/Markers'
 
@@ -32,6 +32,7 @@ const types = {
 
     belongsTo: {
         type: 'int8',
+        hasModifier: true,
         constraints: {
             foreignKey: true
         }
@@ -114,6 +115,23 @@ const defaultFieldCreator = function (alias, property, type, typeModifier, const
         const defaults = property.initializer.call(this)
         if(!this.fields) Object.defineProperty(this, 'fields', { enumerable: false, value: {} })
         this.fields[name] = ({ alias, name, type, typeModifier, defaults, constraints })
+        if(alias == 'hasMany'){
+            let relationTable = constraints.of || property.key;
+            let foreignKey = toCamelCase(toForeignKeyName(toSingular(constraints.as || this.constructor.tableName)))
+            Object.defineProperty(defaults, '__of__', {
+                enumerable: true,
+                get: () => {
+                    let Model = this.constructor.models[relationTable]
+                    return Model
+                } 
+            })
+            Object.defineProperty(defaults, '__presets__', {
+                enumerable: true,
+                get: () => {
+                    return { [foreignKey]: this.id }
+                } 
+            })
+        }
         return defaults
     }
     return { ...property, initializer }

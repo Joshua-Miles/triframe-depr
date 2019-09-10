@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Dimensions, View, StyleSheet } from "react-native";
+import { Dimensions, View, ScrollView } from "react-native";
 import { each } from "triframe/mason";
 import { Text } from '.'
 
 
 export const Container = ({ children }) => (
-    <View style={{ margin: 50}}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{
+        flexGrow: 1, display: 'flex', margin: 50
+    }}>
         {renderChildren(children)}
-    </View>
+    </ScrollView>
 )
 
 export const Section = ({ children, inline, style }) => (

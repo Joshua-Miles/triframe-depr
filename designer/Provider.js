@@ -6,6 +6,7 @@ import { Pipe, EventEmitter } from '../herald';
 import { Platform, Router, Title } from './index'
 import { Provider as PaperProvider } from 'react-native-paper'
 import { crawl } from '../mason';
+import { View } from 'react-native'
 
 const Model = React.createContext({ areReady: false })
 
@@ -46,18 +47,20 @@ const Main = ({ children, iconSets = ['MaterialIcons'], url = '' }) => {
     return (
         <Model.Provider value={models}>
             {Platform.OS === 'web' ? (
-            <style type="text/css">{`
+                <style type="text/css">{`
                 ${iconSets.map(iconSet => (
-                `@font-face {
+                    `@font-face {
                         font-family: ${iconSet};
                         src: url(${require(`react-native-vector-icons/Fonts/${iconSet}.ttf`)}) format('truetype');
                     }`
-            ))}
+                ))}
             `}</style>
-        ) : null}
-            <Router>
-                {children}
-            </Router>
+            ) : null}
+            <View style={{ height: '100vh'}}>
+                <Router>
+                    {children}
+                </Router>
+            </View>
         </Model.Provider>
     )
 }
@@ -87,7 +90,7 @@ let createUse = () => {
                     value: function (attributes) {
                         Object.assign(this, attributes)
                         crawl(this, monitor)
-                        if(this._onChange) this._onChange()
+                        if (this._onChange) this._onChange()
                         else agent.emit(`update.${index}`)
                     }
                 })
@@ -163,7 +166,7 @@ let ConnectedComponent = withRouter(({ props = [], models, Component, history, m
 
             let [use, restartUse] = createUse()
             let useContext = createUseContext(models)
-            let useHistory = new Pipe( () => ({ history, match, location }) )
+            let useHistory = () => new Pipe(() => ({ history, match, location }))
             let redirect = path => history.push(path)
             let payload = { models, props, whileLoading, useContext, useHistory, use, redirect }
             pipe = new Pipe(() => Component(payload), payload)

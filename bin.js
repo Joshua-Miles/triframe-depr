@@ -97,7 +97,7 @@ export class ${name} extends Model {
                     var code= `import React from 'react'
 import { tether, Container, Button, HelperText, ${Object.keys(inputs).join(', ')} } from 'triframe/designer'
 
-const ${Name} = tether(function*({ use, models }) {
+const ${Name} = tether(function*({  models, props, use, useContext, useHistory, redirect  }) {
     const { ${Model} } = models
     const form = yield use(new ${Model}({${defaults}
     }))
@@ -119,7 +119,7 @@ export { ${Name} }`
                     var code= `import React from 'react'
 import { tether, Container, Title } from 'triframe/designer'
 
-const ${Name} = tether(function*({ use, useContext, models, history }) {
+const ${Name} = tether(function*({  models, props, use, useContext, useHistory, redirect  }) {
     return (
         <Container>
             <Title>${Name}</Title>

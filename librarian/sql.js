@@ -11,14 +11,17 @@ export async function query(callback) {
     const main = async () => {
         let library = createLibrary(types)
         let query = callback(library)
+        console.time('Query')
         console.log(query)
-        // console.log(escaped)
         let response = await database.query(query, escaped)
+        console.timeEnd('Query')
         let results = {}
+        console.time('Format')
         response.rows.forEach( (row, index) => {
             formatResult(row, results, index)
         })
         const [ result ] = Object.values(results)
+        console.timeEnd('Format')
         return result || new Collection
     }
 
@@ -36,7 +39,8 @@ export async function query(callback) {
             },
 
             keysOf: (attributes) => {
-                return createLiteral(Object.keys(filter(attributes, (key, value) => value !== undefined )).map(toUnderscored).join(','))
+                return createLiteral(Object.keys(filter(attributes, (key, value) => value !== undefined ))
+                            .map( key => `"${toUnderscored(key)}"`).join(','))
             },
 
             valuesOf: (attributes) => {
@@ -48,7 +52,7 @@ export async function query(callback) {
                 each(attributes, (key, value) => {
                     if(value == undefined) return
                     key = toUnderscored(key)
-                    value = escape(value)
+                    value = Array.isArray(value) ? value.map(escape) : escape(value)
                     result = result ? `${result} ${seperator} ${callback(key, value)}` : callback(key, value)
                 })
                 return createLiteral(result)
@@ -101,11 +105,12 @@ export async function query(callback) {
                     })
                     break;
                 case 'belongsTo':
+                    var opts = field.typeModifier || {}
                     Object.defineProperty(ModelRep, key, {
                         value: createLiteral(`"${name}".${toUnderscored(key)}`)
                     })
                     key = key.substr(0, key.length-3)
-                    var relationTable = toTableName( key);
+                    var relationTable = opts.a ? toTableName(opts.a) : toTableName( key);
                     var relationName = `${name}.${key}`
                     var Relation = models[relationTable]
                     if(!Relation) throw Error(`Could not find relation "${key}"`)

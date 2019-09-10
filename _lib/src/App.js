@@ -25,7 +25,7 @@ import {
 
 
 
-function* App({ models, history, props, use, useContext }) {
+function* App({ models, props, use, useContext, useHistory, redirect }) {
   let state = yield use({
     toggleSwitch: false,
     toggleButton: 'unchecked',

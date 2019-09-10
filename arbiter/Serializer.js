@@ -223,6 +223,8 @@ export class Serializer {
             } else {
                 //console.log(propertyName)
             }
+            // if(propertyName.startsWith('Collection')) console.log(propertyName, document)
+
         }
         if (typeof document === 'function') return {
             __type__: document.name
