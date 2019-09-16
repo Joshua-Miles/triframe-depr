@@ -82,7 +82,7 @@
   "jest": {
     "verbose": true,
     "testPathIgnorePatterns": [
-      "_lib/"
+      "__assets__"
     ]
   },
   "peerDependencies": {
