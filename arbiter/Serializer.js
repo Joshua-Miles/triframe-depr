@@ -1,5 +1,5 @@
 import { jsonpatch } from './jsonpatch'
-import { Collection } from '../librarian';
+import { Collection } from '../librarian/Collection';
 import { EventEmitter } from '../herald';
 import { map, filter } from '../mason';
 import { markersFor } from './Markers'
@@ -18,17 +18,6 @@ export class Serializer {
             types: map({ ...types, Collection }, (name, Type) => this.serializeType(Type, this.agent.of(name))),
             dependencies: this.dependencies
         }
-    }
-
-    createSocketServer(io) {
-        io.on('connection', socket => {
-            socket.emit('interface', this.interface)
-            socket.on('message', ({ action, payload, id }) => this.agent.emit(action, {
-                ...payload, socket, respond: (result) => {
-                    socket.emit(id, result)
-                }
-            }))
-        })
     }
 
     serializeType(Type, agent) {

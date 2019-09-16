@@ -28,7 +28,7 @@ export class Model extends DBConnection {
 
     @_stream
     static * find(id) {
-        yield this.nowAndOn(`${id}`)
+        yield this.nowAndOn(`updated.${id}`)
         let results = yield this.query(({ sql, self }) => (sql`
             SELECT ${self('*')} FROM ${self}
             WHERE id=${id}
@@ -38,7 +38,6 @@ export class Model extends DBConnection {
 
     @_stream
     static *where(attributes) {
-        console.log(attributes)
         yield this.nowAndOn('*')
         return this.query(({ sql, self, each }) => sql`
             SELECT ${self('*')} FROM ${self}
@@ -64,11 +63,11 @@ export class Model extends DBConnection {
         )}`)
     }
 
-    static async destroyAll() {
+    static async truncate() {
         let result = await this.query(({ sql, self }) => (sql`
             DELETE FROM ${self};
         `))
-        this.emit('*')
+        this.emit('truncated')
         return result
     }
 
@@ -116,14 +115,15 @@ export class Model extends DBConnection {
                 )}
                 WHERE id=${this.id}
             `)
-            await this.emit(`${this.id}`)
+            await this.emit(`updated.${this.id}`, this)
         } else {
             delete attributes.id
-            this.id = await this.query(({ sql, self, keysOf, valuesOf }) => (sql`
+            let result = await this.query(({ sql, self, keysOf, valuesOf }) => (sql`
                 INSERT INTO ${self} (${keysOf(attributes)}) VALUES (${valuesOf(attributes)})
                 RETURNING id
             `))
-            await this.emit('*')
+            this.id = result.first.id
+            await this.emit('created', this)
         }
         return this
     }
@@ -133,7 +133,7 @@ export class Model extends DBConnection {
             DELETE FROM ${self}
             WHERE id=${this.id}
         `)
-        this.emit(`${this.id}`)
+        this.emit(`destroyed.${this.id}`, this)
         return result
     }
 

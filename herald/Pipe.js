@@ -8,6 +8,8 @@ export class Pipe {
     errorHandlers = []
     cancelationHandlers = []
 
+    executions = []
+
     constructor(process, ...args) {
         let thisArg;
         if (Array.isArray(process)) {
@@ -20,12 +22,12 @@ export class Pipe {
         setTimeout(() => {
             if (!this.alreadyInitialized && !this.isCanceled) this[execute]()
         })
-        this.emit.throwError = this.throwError
     }
 
     observe(callback) {
         if (this.cachedValue) callback(this.cachedValue)
         this.observers.push(callback)
+        return this
     }
 
     unobserve(callback) {
@@ -78,13 +80,30 @@ export class Pipe {
 
     [execute] = async () => {
         let cursor;
+        let aborted = false
+        let abortThis = () => aborted = true
+        this.executions.push(abortThis)
+
+        let emit = (...args) => {
+            if(aborted) return
+            while(this.executions.length && this.executions[0] != abortThis){
+                let abort = this.executions.shift()
+                abort()
+            }
+            this.executions.shift()
+            this.emit(...args)
+        }
+
+        emit.throwError = this.throwError
+
         try {
-            cursor = this.process.call(this.thisArg, this.emit, ...this.args)
+            cursor = this.process.call(this.thisArg, emit, ...this.args)
         } catch (err) {
             this.throwError(err)
         }
 
 
+        
 
         const process = ({ value, done }) => {
             return new Promise(async () => {
@@ -94,8 +113,8 @@ export class Pipe {
 
                 let next;
                 if (done && value === undefined) return
-                if (done) next = this.emit
-                else next = moveCursor
+                if (done) next = (...args) => !aborted && emit(...args)
+                else next = (...args) => !aborted && moveCursor(...args)
 
                 if (cachedValue) await next(cachedValue.currentValue);
                 else if (isPipe(value)) { 

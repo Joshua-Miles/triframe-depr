@@ -1,4 +1,6 @@
-import { _shared } from "../arbiter";
+import { _shared } from "../arbiter/Markers";
+
+
 
 export class Collection {
 
@@ -64,6 +66,8 @@ export class Collection {
 
     @_shared
     push(element){
+        let { last } = this
+        element.__index__ = last ? last.__index__ + 1 : 0
         return this[element.id] = element
     }
 
@@ -89,9 +93,12 @@ export class Collection {
         element._onChange = this._onChange
         this.__of__.create(attributes)
             .then( result => {
-                this[result.id] = result
+                console.log('Pushing', this[result.id])
+                // console.log('IN HERE', result)
+                this.push(result)
                 //if(this[element.id]) console.log(this[element.id].symbol)
                 delete this[element.id]
+                // console.log(this._onChange)
                 this._onChange()
             })
     }

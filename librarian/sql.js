@@ -8,21 +8,48 @@ export async function query(callback) {
     const types = this.types;
     const self = this.tableName
 
+    let group
+
     const main = async () => {
         let library = createLibrary(types)
         let query = callback(library)
-        console.time('Query')
+        if(group && !query.includes('GROUP BY')) query = `${query} GROUP BY ${group}`
         console.log(query)
         let response = await database.query(query, escaped)
-        console.timeEnd('Query')
-        let results = {}
-        console.time('Format')
-        response.rows.forEach( (row, index) => {
-            formatResult(row, results, index)
-        })
-        const [ result ] = Object.values(results)
-        console.timeEnd('Format')
+        let result = Collection.fromArray(response.rows.map( (row, index) => {
+            let document = crawl(row.json_build_object || row) 
+            document.__index__ = index
+            return document
+        }))
         return result || new Collection
+    }
+
+    const crawl = ( record ) => {
+        if(!record){
+            return record
+        } else if(record.__class__){
+            let Model = types[record.__class__];
+            let document = new Model;
+            each(record, ( key, value ) => {
+                if(!key.startsWith('__')) key = toCamelCase(key)
+                if(document[key] instanceof Collection){
+                    value.__of__ = document[key].__of__
+                    value.__presets__ = document[key].__presets__
+                }
+                document[key] = crawl(value)
+            })
+            return document
+        } else if(Array.isArray(record)){
+            let collection = new Collection;
+            collection.__of__ = record.__of__
+            collection.__presets__ = record.__presets__
+            record.forEach( record => {
+                collection.push(crawl(record))
+            })
+            return collection;
+        }  else {
+            return record
+        }
     }
 
     const createLibrary = models => {
@@ -60,7 +87,7 @@ export async function query(callback) {
         }
 
         each(models, (key, Model) => {
-            let name = `${Model.tableName}.[i]`
+            let name = `${Model.tableName}`
             define(library, Model.tableName, () => createModelRep(name, Model, models))
         })
 
@@ -69,37 +96,43 @@ export async function query(callback) {
         return library
     }
 
-    const createModelRep = (name, Model, models) => {
-        let instance = new Model
-        const ModelRep = (...fields) => {
+    const createModelRep = (name, Model, models, asCollection) => {
+        let instance = new Model 
+        const ModelRep = function(...fields) {
             let select = fields.map((field, index) => {
                 if(field == '*'){
                     return Object.keys(filter(instance.fields, (key, field) => field.type != 'virtual' && key != 'id')).map( (key) => {
-                        return `"${name}".${key} as "${name}.${key}"`
-                    }).join(',')
+                        return `'${key}', "${name}"."${key}"`
+                    }).join(',\n        ')
+                }
+                if(typeof field == 'symbol'){
+                    group = `"${name}".id`
+                    return resolveParameter(field)
                 }
                 if (!ModelRep[field]) {
                     throw Error(`No such column ${field} for table ${name}`)
                 }
-                return `${resolveParameter(ModelRep[field])} as "${name}.${field}"`
+                return `'${field}', ${resolveParameter(ModelRep[field])}`
             })
             select = select.join(',')
-            return createLiteral(`${select}, "${name}".id as "${name}.id", '${Model.name}' as "${name}.__class__"`)
+            select = `json_build_object('id', "${name}".id,\n         '__class__', '${Model.name}', \n        ${select})`
+            if(asCollection) select = `'${name}', array_agg(${select})`
+            return createLiteral(select)
         }
-        ModelRep.asLiteral = () => `${Model.tableName} as "${Model.tableName}.[i]"`
+        ModelRep.asLiteral = () => `${Model.tableName}`
         each(instance.fields, (key, field) => {
             switch (field.alias) {
                 case 'hasMany':
                     var opts = field.typeModifier
                     var alias = toForeignKeyName(toSingular(opts.as || Model.tableName))
                     var relationTable = opts.of || key;
-                    var relationName = `${name}.${key}.[i]`
+                    var relationName = key;
                     var Relation = models[relationTable]
                     if(!Relation) throw Error(`Could not find relation "${key}"`)
                     define(ModelRep, key, () => {
-                        var relationCollection = createModelRep(relationName, Relation, models)
+                        var relationCollection = createModelRep(relationName, Relation, models, true)
                         relationCollection.join = () => createLiteral(
-                            `LEFT JOIN ${relationTable} as "${relationName}" ON "${relationName}".${alias}="${name}".id`
+                            `LEFT JOIN ${relationTable} ON ${relationTable}.${alias} = ${name}.id`
                         )
                         return relationCollection
                     })
@@ -118,7 +151,7 @@ export async function query(callback) {
                     define(ModelRep, key, () => {
                         var relationCollection = createModelRep(relationName, Relation, models)
                         relationCollection.join = () => createLiteral(
-                            `LEFT JOIN ${relationTable} as "${relationName}" ON "${name}".${alias}="${relationName}".id`
+                            `LEFT JOIN ${relationTable} ON ${name}.${alias} = ${relationName}.id`
                         )
                         return relationCollection
                     })
@@ -194,7 +227,13 @@ export async function query(callback) {
         })
     }
 
+    try {
+
     return await main()
+
+    }catch( err ) {
+        console.log(err)
+    }
 }
 
 let containerFor = matrix => {

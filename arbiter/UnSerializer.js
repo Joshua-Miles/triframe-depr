@@ -4,32 +4,13 @@ import { map, each, filter, index } from '../mason'
 import { snapshot } from "../mason";
 import { memoize } from '../herald/memoize';
 
-const print = variable => JSON.stringify(variable,null,2)
+const print = variable => JSON.parse(JSON.stringify(variable))
 
 let compare = (obj1, obj2) => {
     let patches = jsonpatch.compare(obj1, obj2)
-    return patches.filter( patch => !patch.path.includes('__'))
+    return patches.filter(patch => !patch.path.includes('__'))
 }
 
-let bin = {}
-let createDevTools = name  => {
-   
-    return {
-        initial: data => {
-            bin[name] = bin[name] || { 
-                base: PENDING_VALUE,
-                patches: []
-            }
-            bin[name].base = data
-        },
-        change: (label, patches) => {
-            if(!patches.length) return;
-            bin[name].patches.push( {label, patches})
-        }
-    }
-}
-
-if(typeof window !== 'undefined') window.bin = bin
 
 let PENDING_VALUE = Symbol()
 let stringify = op => JSON.stringify(op)
@@ -37,23 +18,24 @@ export class UnSerializer {
 
     patches = {}
 
-    states= {}
+    states = {}
 
     constructor({ dependencies, types }) {
-        if(typeof window !== 'undefined') window.patches = this.patches
+        if (typeof window !== 'undefined') window.patches = this.patches
 
 
-        if(typeof window !== 'undefined') window.states = this.states
+        if (typeof window !== 'undefined') window.states = this.states
         this.agent = new EventEmitter
         this.dependencies = dependencies
-        
+
         this.types = map(types, (key, type) => this.unSerializeType(type, this.agent.of(key)))
-        if(typeof window !== 'undefined') Object.assign(window, this.types)
+        this.types.Array = Array
+        if (typeof window !== 'undefined') Object.assign(window, this.types)
     }
 
     unSerializeType({ name, classProperties, instanceProperties }, agent) {
-        const Type = class { 
-            constructor(attributes){
+        const Type = class {
+            constructor(attributes) {
                 Object.assign(this, attributes)
             }
         }
@@ -83,10 +65,10 @@ export class UnSerializer {
                 let getter = this.unSerializeFunction(name, value.get, markers, agent)
                 let setter = this.unSerializeFunction(name, value.set, markers, agent)
                 return {
-                    get:  value.get ? getter : function(){
+                    get: value.get ? getter : function () {
                         return getter.call(this)
                     },
-                    set:  value.set ? setter : function(value){
+                    set: value.set ? setter : function (value) {
                         return setter.call(this, value)
                     }
                 }
@@ -102,7 +84,6 @@ export class UnSerializer {
 
     unSerializeFunction(name, func, markers, agent) {
         const serializer = this
-        const devtools = createDevTools(name)
         const { shared, stream } = markers
         const cache = stream;
         if (shared && func) {
@@ -110,7 +91,7 @@ export class UnSerializer {
             let dependencies = dependencyValues.map(index => this.dependencies[index])
             return new Function(...dependencyNames, `return (${code})`)(...dependencies)
         } else {
-            
+
             let bin = {}
             const method = function (...args) {
                 let openPipe = () => new Pipe([this, ambassador], ...args)
@@ -118,17 +99,17 @@ export class UnSerializer {
                     let hash = JSON.stringify({ args, attributes: this })
                     if (!bin[hash]) {
                         bin[hash] = openPipe()
-                    } 
+                    }
                     return bin[hash]
                 } else {
                     return openPipe()
                 }
             }
 
-    
+
             const ambassador = function* (emit, ...args) {
-                let patches = []            
-                serializer.patches[name] = patches    
+                let patches = []
+                serializer.patches[name] = patches
                 let serializedResult = PENDING_VALUE
                 let result = PENDING_VALUE
 
@@ -137,12 +118,12 @@ export class UnSerializer {
                         emit.throwError(response.message)
                     }
                     if (serializedResult === PENDING_VALUE || !serializedResult) {
-                        devtools.initial(response)
                         serializedResult = response
                         emitDocument()
-                    } else if(response){
+                    } else if (response) {
+
                         let docChanged = reconcileOperations(response)
-                        if(docChanged){
+                        if (docChanged) {
                             emitDocument()
                         }
                     } else {
@@ -152,18 +133,23 @@ export class UnSerializer {
                 }
 
                 const emitDocument = function () {
-                    try{
-                        let x = snapshot(serializedResult)
-                        //if(name == 'Document.editorSession') console.log(scopeMarker, 'applied', print(patches))
-                        jsonpatch.applyPatch(x, patches)
-                        result = serializer.unSerializeDocument(x, onChange)
-                    } catch(err){console.warn(err)}
-                    emit(result)
+                    let x = result
+                    if (typeof serializedResult == 'object') {
+                        try {
+                            // console.log('Patching: ', print(patches))
+                            result = snapshot(serializedResult)
+                            //if(name == 'Document.editorSession') console.log(scopeMarker, 'applied', print(patches))
+                            jsonpatch.applyPatch(result, patches)
+                            // console.log('Patched:', print(result))
+                            x = unSerializeDocument(result, onChange)
+                        } catch (err) { console.warn(err) }
+                    }
+                    // console.log(x)
+                    emit(x)
                 }
 
                 const onChange = function (diff) {
                     //console.trace(diff)
-                    devtools.change('local', diff)
                     patches.push(...diff)
                     patches = optimizePatches(patches)
                     //if(name == 'Document.editorSession') console.log(scopeMarker, 'optmized', print(patches))
@@ -171,7 +157,7 @@ export class UnSerializer {
                 }
 
                 const reconcileOperations = function (ops) {
-                    let changed= false
+                    let changed = false
                     let reconciliationPatch = []
 
                     let patchHashes = patches.map(stringify)
@@ -179,17 +165,21 @@ export class UnSerializer {
                     //if(name == 'Document.editorSession') console.log(scopeMarker, 'reconciling', print(patches))
                     ops.forEach((op, opIndex) => {
                         let patchIndex = patchHashes.indexOf(opHashes[opIndex])
-                        if (patchIndex > -1) delete patches[patchIndex]
+                        if (patchIndex > -1) {
+                            // console.log("HERE-------------------------------------------------------------")
+                            delete patches[patchIndex]
+                        }
                         else changed = true
                         reconciliationPatch.push(op)
                     })
-                    devtools.change('server', reconciliationPatch)
+
                     jsonpatch.applyPatch(serializedResult, reconciliationPatch)
                     // if(name == 'Document.editorSession') console.log(scopeMarker, 'rebased', 
                     //     print(reconciliationPatch)
                     // )
+                    // console.log('Rebasing:', print(reconciliationPatch))
                     //if(name == 'Document.editorSession') console.log(scopeMarker, 'reconciled pre filter', print(patches))
-                    serializer.patches[name] =patches = patches.filter(x => x)
+                    serializer.patches[name] = patches = patches.filter(x => x)
                     //if(name == 'Document.editorSession') console.log(scopeMarker, 'reconciled', print(patches))
                     return changed
                 }
@@ -198,18 +188,52 @@ export class UnSerializer {
                 const optimizePatches = patches => {
                     //return patches
                     let bin = {}
-                    patches.forEach( patch => {
-                        if(bin[patch.path]){
-                            if(patch.op == 'remove'){
-                                delete bin[patch.path]
-                            } else {
-                                bin[patch.path]= patch
-                            }
+                    patches.forEach(patch => {
+                        if (bin[patch.path] && bin[patch.path].op == 'add' && patch.op == 'remove') {
+                            delete bin[patch.path]
                         } else {
-                            bin[patch.path]= patch
+                            let temp = snapshot(serializedResult)
+                            jsonpatch.applyPatch(temp, [patch])
+                            let patches = compare(serializedResult, temp)
+                            let changesBase = !!patches.length
+                            if (changesBase) {
+                                // console.log('CHANGES:', patches)
+                                bin[patch.path] = patch
+                            }
                         }
                     })
                     return Object.values(bin);
+                }
+
+
+                const read = (obj, path) => {
+                    if (path.length === 0) return obj
+                    let [next, ...rest] = path;
+                    return read(obj[next], rest)
+                }
+
+                const unSerializeDocument = (document, callback = () => void (0), path = '') => {
+                    if (!document) return document
+                    if (document.__type__) return serializer.types[document.__type__]
+                    if (!document.__class__ && typeof document != 'object') return document
+                    let response = serializer.types[document.__class__] ? new serializer.types[document.__class__] : new Object
+                    Object.assign(response, map(document, (propertyName, document) => unSerializeDocument(document, callback, `${path}/${propertyName}`)))
+                    let resultSnapshot = snapshot(response)
+                    Object.defineProperty(response, '_onChange', {
+                        value: function () {
+                            // console.log('Diffing:', print(resultSnapshot), print(response))
+                            let patches = compare(resultSnapshot, response)
+                            jsonpatch.applyPatch(resultSnapshot, patches)
+                            // These patches may not be necessary if the base already has the update from the server
+                            // Once staged, these patches will NEVER be reconciled because the server has already re-based them
+                            // This creates a memory and cpu leak where the patch list grows without ever rebasing
+                            this.patches.push(...patches)
+                            let adjustedPatches = patches.map(patch => ({ ...patch, path: `${path}${patch.path}` }))
+                            callback(adjustedPatches)
+                        }
+                    })
+                    Object.defineProperty(response, 'patches', { value: [] })
+                    return response
                 }
 
 
@@ -220,34 +244,13 @@ export class UnSerializer {
                     attributes: Number.isFinite(this.id) ? null : this,
                     respond: handleResponse
                 })
-                try{
+                try {
                     this.patches = []
-                } catch(err){}
+                } catch (err) { }
             }
             return method
         }
     }
 
-    unSerializeDocument = (document, callback = () => void (0), path = '') => {
-        let serializer = this
-        if (!document) return document
-        if (document.__type__) return this.types[document.__type__]
-        if (!document.__class__ && typeof document != 'object') return document
-        let result = this.types[document.__class__] ? new this.types[document.__class__] : new Object
-        Object.assign(result, map(document, (propertyName, document) => this.unSerializeDocument(document, callback, `${path}/${propertyName}`)))
-        let resultSnapshot = snapshot(result) 
-        //setTimeout(() => resultSnapshot = snapshot(result))
-        Object.defineProperty(result, '_onChange', {
-            value: function () {
-                let patches = compare(resultSnapshot, result)
-                this.patches.push(...patches)
-                resultSnapshot = snapshot(this)
-                let adjustedPatches = patches.map( patch => ({ ...patch, path: `${path}${patch.path}`}))
-                callback(adjustedPatches)
-            }
-        })
-        Object.defineProperty(result, 'patches', { value: [] })
-        return result
-    }
 
 }
