@@ -123,7 +123,7 @@ export async function query(callback) {
         each(instance.fields, (key, field) => {
             switch (field.alias) {
                 case 'hasMany':
-                    var opts = field.typeModifier
+                    var opts = field.metadata || {}
                     var alias = toForeignKeyName(toSingular(opts.as || Model.tableName))
                     var relationTable = opts.of || key;
                     var relationName = key;
@@ -138,7 +138,7 @@ export async function query(callback) {
                     })
                     break;
                 case 'belongsTo':
-                    var opts = field.typeModifier || {}
+                    var opts = field.metadata || {}
                     Object.defineProperty(ModelRep, key, {
                         value: createLiteral(`"${name}".${toUnderscored(key)}`)
                     })

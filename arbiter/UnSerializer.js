@@ -143,6 +143,8 @@ export class UnSerializer {
                             // console.log('Patched:', print(result))
                             x = unSerializeDocument(result, onChange)
                         } catch (err) { console.warn(err) }
+                    } else{
+                        x = serializedResult
                     }
                     // console.log(x)
                     emit(x)

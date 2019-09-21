@@ -32,10 +32,27 @@ const alterColumn = (name, operations) => (
 const defineColumn = (name, { type, typeModifier, defaults, constraints }) => {
     let definition = `"${name}" ${type}`
     if(typeModifier) definition = `${definition}(${typeModifier})`
-    if(typeof defaults == 'number' || typeof defaults == 'boolean' ||  defaults === null) definition = `${definition} DEFAULT ${defaults}`
-    else if (defaults !== undefined) definition = `${definition} DEFAULT '${defaults}'`
+    if(defaults !== undefined) definition = `${definition} DEFAULT ${format(defaults)}`
     if(constraints) definition = `${definition} ${defineConstraints(constraints)}`
     return definition
+}
+
+// 2004-10-19 10:23:54+02
+const format = function(defaults){
+    if(defaults === null){
+        return "NULL"
+    }
+    if(typeof defaults == 'number' || typeof defaults == 'boolean'){
+        return defaults
+    }
+    if(typeof defaults == 'string'){
+        return `'${defaults}'`
+    }
+    if(defaults instanceof Date){
+        return "NOW()"
+    }
+    
+    throw Error(`Variable type cannot be coalesced for sql query: ${defaults}`)
 }
 
 const defineConstraints = function({ unique, notNull, primaryKey, references }){
@@ -63,7 +80,7 @@ const dropNotNull = (name) => (
 )
 
 const setColumnDefault = (name, defaults) => (
-    `ALTER COLUMN "${name}" SET DEFAULT ${isNumeric(defaults) ? defaults : `'${defaults}'`}`
+    `ALTER COLUMN "${name}" SET DEFAULT ${format(defaults)}`
 )
 
 const dropColumnDefault = (name) => (
@@ -309,5 +326,5 @@ const comparisonOf = function(thing1, thing2){
 }
 
 const serialize = obj => {
-    return JSON.stringify(Object.values(map(obj, (key, value) => `${key}:${value}`)).sort())
+    return JSON.stringify(Object.values(map(obj, (key, value) => `${key}:${value instanceof Date ? 'NOW()' : value}`)).sort())
 }

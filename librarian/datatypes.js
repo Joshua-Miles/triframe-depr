@@ -25,14 +25,11 @@ const types = {
     },
 
     hasMany: {
-        type: 'virtual',
-        hasModifier: true,
-
+        type: 'virtual'
     },
 
     belongsTo: {
         type: 'int8',
-        hasModifier: true,
         constraints: {
             foreignKey: true
         }
@@ -88,23 +85,26 @@ const types = {
 
 }
 
-const createFieldDecorator = (alias, { type, hasModifier, constraints = {}, createField = defaultFieldCreator }) => function (arg1, arg2) {
-    let property, typeModifier;
+const createFieldDecorator = (alias, { type, hasModifier, createField = defaultFieldCreator, constraints = {} }) => function (arg1, arg2) {
+    let property, typeModifier, metadata;
 
-    if (hasModifier) {
-        typeModifier = arg1
-        Object.assign(constraints, arg2 || new Object)
-    }
     if (arg1.key) {
         property = arg1
     } else {
-        Object.assign(constraints, arg1 || new Object)
+        metadata = arg1
+        if(arg2) Object.assign(constraints, arg2)
     }
-    if (property) return createField(alias, property, type, typeModifier, constraints)
-    else return property => createField(alias, property, type, typeModifier, constraints)
+
+
+    if(hasModifier){
+        typeModifier = metadata
+    }
+
+    if (property) return createField(alias, property, type, metadata, typeModifier, constraints)
+    else return property => createField(alias, property, type, metadata, typeModifier, constraints)
 }
 
-const defaultFieldCreator = function (alias, property, type, typeModifier, constraints = {}) {
+const defaultFieldCreator = function (alias, property, type, metadata, typeModifier, constraints = {}) {
     const format = constraints.foreignKey ? toForeignKeyName : toColumnName;
     const name = format(property.key)
     const initializer = function () {
@@ -114,7 +114,7 @@ const defaultFieldCreator = function (alias, property, type, typeModifier, const
         root.flags[columnName] = root.flags[propertyName]
         const defaults = property.initializer.call(this)
         if(!this.fields) Object.defineProperty(this, 'fields', { enumerable: false, value: {} })
-        this.fields[name] = ({ alias, name, type, typeModifier, defaults, constraints })
+        this.fields[name] = ({ alias, name, type, metadata, defaults, typeModifier, constraints })
         if(alias == 'hasMany'){
             let relationTable = constraints.of || property.key;
             let foreignKey = toCamelCase(toForeignKeyName(toSingular(constraints.as || this.constructor.tableName)))

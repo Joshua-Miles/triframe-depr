@@ -65,7 +65,7 @@ program
                 var code= `import { Model } from 'triframe/librarian'
 const { ${Object.keys(decorators).join(', ')} } = Model.Decorators
 
-@_public('find', 'where', 'search', 'create', 'destroyAll', '#commit', '#destroy')
+@_public('find', 'where', 'search', 'create', 'truncate', '#commit', '#destroy')
 export class ${name} extends Model {
     ${definition}
 }`

@@ -9,6 +9,20 @@ export class Collection {
         this.__presets__ = presets
     }
 
+    [Symbol.iterator](){
+        let array = this.toArray()
+        let i = 0;
+        return {
+            next() {
+              if (i < array.length) {
+                return { done: false, value: array[i++] };
+              } else {
+                return { done: true };
+              }
+            }
+          };
+    }
+
     @_shared
     toArray(){
         return this.indexes.map( index => this[index])
