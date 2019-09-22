@@ -114,6 +114,7 @@ export class UnSerializer {
                 let result = PENDING_VALUE
 
                 const handleResponse = function (response) {
+                    console.log("Received", name, response)
                     if (response && response.error) {
                         emit.throwError(response.message)
                     }
@@ -139,6 +140,7 @@ export class UnSerializer {
                             // console.log('Patching: ', print(patches))
                             result = snapshot(serializedResult)
                             //if(name == 'Document.editorSession') console.log(scopeMarker, 'applied', print(patches))
+                            console.log("Patching:", name, print(result), print(patches))
                             jsonpatch.applyPatch(result, patches)
                             // console.log('Patched:', print(result))
                             x = unSerializeDocument(result, onChange)

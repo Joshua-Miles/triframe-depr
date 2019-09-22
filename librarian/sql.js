@@ -40,11 +40,20 @@ export async function query(callback) {
             })
             return document
         } else if(Array.isArray(record)){
+            if(record[0].__isOnly__){
+                if(record[0].id){
+                    return crawl(record[0])
+                } else {
+                    return null
+                }
+            }
             let collection = new Collection;
             collection.__of__ = record.__of__
             collection.__presets__ = record.__presets__
             record.forEach( record => {
-                collection.push(crawl(record))
+                if(record.id !== null){
+                    collection.push(crawl(record))
+                }
             })
             return collection;
         }  else {
@@ -77,9 +86,9 @@ export async function query(callback) {
             each: (attributes, callback, seperator = ',') => {
                 let result = ''
                 each(attributes, (key, value) => {
-                    if(value == undefined) return
+                    if(value === undefined) return
                     key = toUnderscored(key)
-                    value = Array.isArray(value) ? value.map(escape) : escape(value)
+                    if(value !== null) value = Array.isArray(value) ? value.map(escape) : escape(value)
                     result = result ? `${result} ${seperator} ${callback(key, value)}` : callback(key, value)
                 })
                 return createLiteral(result)
@@ -96,7 +105,7 @@ export async function query(callback) {
         return library
     }
 
-    const createModelRep = (name, Model, models, asCollection) => {
+    const createModelRep = (name, Model, models, $as) => {
         let instance = new Model 
         const ModelRep = function(...fields) {
             let select = fields.map((field, index) => {
@@ -115,8 +124,11 @@ export async function query(callback) {
                 return `'${field}', ${resolveParameter(ModelRep[field])}`
             })
             select = select.join(',')
-            select = `json_build_object('id', "${name}".id,\n         '__class__', '${Model.name}', \n        ${select})`
-            if(asCollection) select = `'${name}', array_agg(${select})`
+           
+            if($as == 'collection') select = `'${name}', array_agg(json_build_object('id', "${name}".id,\n         '__class__', '${Model.name}', \n        ${select}))`
+            else if($as == 'first') select = `'${name}', array_agg(json_build_object('id', "${name}".id,\n    '__isOnly__', 'true',     '__class__', '${Model.name}', \n        ${select}))`
+            else  select = `json_build_object('id', "${name}".id,\n         '__class__', '${Model.name}', \n        ${select})`
+
             return createLiteral(select)
         }
         ModelRep.asLiteral = () => `${Model.tableName}`
@@ -130,9 +142,9 @@ export async function query(callback) {
                     var Relation = models[relationTable]
                     if(!Relation) throw Error(`Could not find relation "${key}"`)
                     define(ModelRep, key, () => {
-                        var relationCollection = createModelRep(relationName, Relation, models, true)
+                        var relationCollection = createModelRep(relationName, Relation, models, 'collection')
                         relationCollection.join = () => createLiteral(
-                            `LEFT JOIN ${relationTable} ON ${relationTable}.${alias} = ${name}.id`
+                            `LEFT JOIN ${relationTable} as ${relationName} ON ${relationName}.${alias} = ${name}.id`
                         )
                         return relationCollection
                     })
@@ -144,14 +156,14 @@ export async function query(callback) {
                     })
                     key = key.substr(0, key.length-3)
                     var relationTable = opts.a ? toTableName(opts.a) : toTableName( key);
-                    var relationName = `${name}.${key}`
+                    var relationName = `${key}`
                     var Relation = models[relationTable]
                     if(!Relation) throw Error(`Could not find relation "${key}"`)
-                    var alias = toForeignKeyName(toSingular(Relation.tableName))
+                    var alias = toForeignKeyName(toSingular(relationName))
                     define(ModelRep, key, () => {
-                        var relationCollection = createModelRep(relationName, Relation, models)
+                        var relationCollection = createModelRep(relationName, Relation, models, 'first')
                         relationCollection.join = () => createLiteral(
-                            `LEFT JOIN ${relationTable} ON ${name}.${alias} = ${relationName}.id`
+                            `LEFT JOIN ${relationTable} as ${relationName} ON ${name}.${alias} = ${relationName}.id`
                         )
                         return relationCollection
                     })

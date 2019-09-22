@@ -38,15 +38,20 @@ export class Model extends DBConnection {
 
     @_stream
     static *where(attributes) {
+        console.log(attributes)
         yield this.nowAndOn('*')
         return this.query(({ sql, self, each }) => sql`
             SELECT ${self('*')} FROM ${self}
             WHERE ${
             Object.keys(attributes).length > 0 ?
-                each(attributes, (key, value) =>
-                    Array.isArray(value)
-                        ? `${key} IN (${value.join(', ')})`
-                        : `${key}=${value}`, 'AND'
+                each(attributes, (key, value) => {
+                    if(Array.isArray(value))
+                        return `${key} IN (${value.join(', ')})`
+                    else if (value === null)
+                        return `${key} IS NULL`
+                    else 
+                        return `${key}=${value}`
+                    }, 'AND'
                 ) :
                 1
             }

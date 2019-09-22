@@ -53,7 +53,7 @@ const Main = ({ children, iconSets = ['MaterialIcons'], url = '' }) => {
                         font-family: ${iconSet};
                         src: url(${require(`react-native-vector-icons/Fonts/${iconSet}.ttf`)}) format('truetype');
                     }`
-                ))}
+                )).join("\n")}
             `}</style>
             ) : null}
             <View style={{ height: '100vh'}}>

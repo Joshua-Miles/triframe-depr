@@ -1,5 +1,5 @@
 // Native and Platform Components
-import { View, Platform } from 'react-native'
+import { View, TouchableOpacity, Platform } from 'react-native'
 import { Route, Switch, Redirect } from 'react-router'
 import { Router, Link } from './platform'
 
@@ -19,6 +19,10 @@ import { Button, BubbleButton, ToggleButton, FileInput } from './Button'
 import { Text, Title, Heading, Subheading, Paragraph, Caption } from './Typography'
 import { TextInput, PasswordInput, TextField, HelperText, ToggleSwitch } from './Form'
 
+
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons'
+
+
 const { Grid, Column } = createGrid({
     xs: 0,
     sm: 350,
@@ -27,7 +31,12 @@ const { Grid, Column } = createGrid({
     xl: 950
 })
 
+
 export {
+
+    Icon,
+
+    TouchableOpacity,
 
     // Deprecate
     TextEditor,
