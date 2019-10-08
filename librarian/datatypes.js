@@ -76,7 +76,7 @@ const types = {
     },
 
     polygon: {
-        type: 'polygon'
+        type: 'polygon '
     },
 
     circle: {
@@ -86,10 +86,12 @@ const types = {
 }
 
 const createFieldDecorator = (alias, { type, hasModifier, createField = defaultFieldCreator, constraints = {} }) => function (arg1, arg2) {
-    let property, typeModifier, metadata;
+    let property, typeModifier;
+    let metadata = {};
 
     if (arg1.key) {
         property = arg1
+        
     } else {
         metadata = arg1
         if(arg2) Object.assign(constraints, arg2)
@@ -116,8 +118,8 @@ const defaultFieldCreator = function (alias, property, type, metadata, typeModif
         if(!this.fields) Object.defineProperty(this, 'fields', { enumerable: false, value: {} })
         this.fields[name] = ({ alias, name, type, metadata, defaults, typeModifier, constraints })
         if(alias == 'hasMany'){
-            let relationTable = constraints.of || property.key;
-            let foreignKey = toCamelCase(toForeignKeyName(toSingular(constraints.as || this.constructor.tableName)))
+            let relationTable = metadata.of || property.key;
+            let foreignKey = toCamelCase(toForeignKeyName(toSingular(metadata.as || this.constructor.tableName)))
             Object.defineProperty(defaults, '__of__', {
                 enumerable: true,
                 get: () => {

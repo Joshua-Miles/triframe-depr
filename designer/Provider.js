@@ -11,9 +11,9 @@ import { View } from 'react-native'
 const Model = React.createContext({ areReady: false })
 
 export const Provider = (props) => (
-    <PaperProvider>
+    <Router>
         <Main {...props} />
-    </PaperProvider>
+    </Router>
 )
 
 const Main = ({ children, iconSets = ['MaterialIcons'], url = '' }) => {
@@ -46,21 +46,21 @@ const Main = ({ children, iconSets = ['MaterialIcons'], url = '' }) => {
     }, [])
     return (
         <Model.Provider value={models}>
-            {Platform.OS === 'web' ? (
-                <style type="text/css">{`
+            <PaperProvider>
+                {Platform.OS === 'web' ? (
+                    <style type="text/css">{`
                 ${iconSets.map(iconSet => (
-                    `@font-face {
+                        `@font-face {
                         font-family: ${iconSet};
                         src: url(${require(`react-native-vector-icons/Fonts/${iconSet}.ttf`)}) format('truetype');
                     }`
-                )).join("\n")}
+                    )).join("\n")}
             `}</style>
-            ) : null}
-            <View style={{ height: '100vh'}}>
-                <Router>
+                ) : null}
+                <View style={{ height: '100vh' }}>
                     {children}
-                </Router>
-            </View>
+                </View>
+            </PaperProvider>
         </Model.Provider>
     )
 }
@@ -75,7 +75,7 @@ let createUse = () => {
     const agent = new EventEmitter;
     const createMonitor = index => {
         let monitor = node => {
-            if (Array.isArray(node)) {
+            if (Array.isArray(node) || node.constructor.name == 'Collection') {
                 Object.defineProperty(node, 'new', {
                     configurable: true,
                     value: function (thing) {
@@ -156,10 +156,11 @@ let ConnectedComponent = withRouter(({ props = [], models, Component, history, m
     let jsx = null
 
     const [data, dispatch] = useState({ jsx })
+    const propsArray = Object.values(props)
 
     useEffect(() => {
-        let pipe;
-        (async () => {
+        function restart(){
+            let pipe;
             if (models.areReady === false) return
 
             let whileLoading = (jsx) => dispatch({ jsx })
@@ -168,14 +169,17 @@ let ConnectedComponent = withRouter(({ props = [], models, Component, history, m
             let useContext = createUseContext(models)
             let useHistory = () => new Pipe(() => ({ history, match, location }))
             let redirect = path => history.push(path)
+
+
             let payload = { models, props, whileLoading, useContext, useHistory, use, redirect }
             pipe = new Pipe(() => Component(payload), payload)
             pipe.observe(jsx => {
                 restartUse()
                 dispatch({ jsx })
             })
-        })()
-        return () => pipe && pipe.destroy()
-    }, [models.areReady, ...Object.values(props)])
+            return () => pipe && pipe.destroy()
+        }
+        return restart()
+    }, [models.areReady, ...propsArray])
     return data.jsx
 })

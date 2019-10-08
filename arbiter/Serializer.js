@@ -115,7 +115,7 @@ export class Serializer {
 
                 // Create the object of the request
                 let createTarget = async() => {
-                    let target = currentPlacement == 'class' ? Type : (Number.isInteger(id) ? await Type.find(id, { includes }) : new Type)
+                    let target = currentPlacement == 'class' ? Type : (Number.isInteger(id) ? await Type.find(id, includes) : new Type)
                     try { jsonpatch.applyPatch(target, patches) } catch (err) { }
                     if (attributes) Object.assign(target, attributes)
                     return target

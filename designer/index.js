@@ -4,7 +4,7 @@ import { Route, Switch, Redirect } from 'react-router'
 import { Router, Link } from './platform'
 
 // Native Paper Components
-import { Appbar, Avatar, Menu, Divider } from 'react-native-paper';
+import { Appbar, Avatar, Menu, Divider, Badge, RadioButton } from 'react-native-paper';
 
 // 
 import { Provider, tether } from './Provider'
@@ -51,7 +51,7 @@ export {
     View, Container, Section, Area, Grid, Column, Divider,
 
     // Common
-    Drawer, Modal, Appbar, Avatar, Menu,
+    Drawer, Modal, Appbar, Avatar, Menu, Badge,
 
     // Typography
     Text, Title, Heading, Subheading, Paragraph, Caption,
@@ -60,7 +60,7 @@ export {
     Button, BubbleButton, ToggleButton,
 
     // Form
-    TextInput, PasswordInput, FileInput, TextField, HelperText, ToggleSwitch,
+    TextInput, PasswordInput, FileInput, TextField, HelperText, ToggleSwitch, RadioButton,
 
     // Material
     Chip, Card, List,

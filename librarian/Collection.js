@@ -31,7 +31,17 @@ export class Collection {
     @_shared
     static fromArray(array){
         let collection = new this
-        array.forEach( element => collection.push(element))
+        let homogeneous = true
+
+        array.forEach( (element, index) => {
+            collection.push(element)
+            if(index < Array.length -1 && element.__class__ != array[index+1].__class__){
+                homogeneous = false
+            }
+        })
+        if(homogeneous && array[0]){
+            collection.__of__ = array[0].constructor
+        }
         return collection
     }
 
@@ -90,8 +100,9 @@ export class Collection {
         let assign = Object.assign.bind(Object)
         assign(attributes, this.__presets__)
         const element = this.__of__.new(attributes)
-        //this.push(this.__of__.new(element))
+        this.push(this.__of__.new(element))
         //this[this.nextID] = this.__of__.new(element)
+        this._onChange()
         return element
     }
 

@@ -9,7 +9,6 @@ export default ({ children, open, render = () => null, onClose }) => {
         else drawer.closeDrawer()
     }, [ open ])
 
-    const closeDrawer = () => drawer.closeDrawer()
     return (
         <DrawerLayout
             onDrawerClose={onClose}
@@ -17,7 +16,7 @@ export default ({ children, open, render = () => null, onClose }) => {
             drawerLockMode={'unlocked'}
             keyboardDismissMode="on-drag"
             ref={ x => drawer = x }
-            renderNavigationView={() => render({ closeDrawer })}>
+            renderNavigationView={() => render({ closeDrawer: onClose })}>
             {children}
         </DrawerLayout>
     )

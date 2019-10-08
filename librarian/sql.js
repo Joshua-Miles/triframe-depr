@@ -92,7 +92,9 @@ export async function query(callback) {
                     result = result ? `${result} ${seperator} ${callback(key, value)}` : callback(key, value)
                 })
                 return createLiteral(result)
-            }
+            },
+
+            literal: value => ({ asLiteral: () => value })
         }
 
         each(models, (key, Model) => {
@@ -118,6 +120,10 @@ export async function query(callback) {
                     group = `"${name}".id`
                     return resolveParameter(field)
                 }
+                if(Array.isArray(field)){
+                    let [ name, definition ] = field
+                    return `'${name}', ${definition}`
+                }
                 if (!ModelRep[field]) {
                     throw Error(`No such column ${field} for table ${name}`)
                 }
@@ -137,7 +143,7 @@ export async function query(callback) {
                 case 'hasMany':
                     var opts = field.metadata || {}
                     var alias = toForeignKeyName(toSingular(opts.as || Model.tableName))
-                    var relationTable = opts.of || key;
+                    var relationTable = toTableName(opts.of || key);
                     var relationName = key;
                     var Relation = models[relationTable]
                     if(!Relation) throw Error(`Could not find relation "${key}"`)
@@ -149,18 +155,36 @@ export async function query(callback) {
                         return relationCollection
                     })
                     break;
+                case 'hasOne':
+                        var opts = field.metadata || {}
+                        var alias = toForeignKeyName(toSingular(opts.as || Model.tableName))
+                        var relationTable = toTableName(opts.of || key);
+                        var relationName = key;
+                        var Relation = models[relationTable]
+                        if(!Relation) throw Error(`Could not find relation "${key}"`)
+                        define(ModelRep, key, () => {
+                            var relationCollection = createModelRep(relationName, Relation, models, 'first')
+                            relationCollection.join = () => createLiteral(
+                                `LEFT JOIN ${relationTable} as ${relationName} ON ${relationName}.${alias} = ${name}.id`
+                            )
+                            return relationCollection
+                        })
+                        break;
                 case 'belongsTo':
                     var opts = field.metadata || {}
                     Object.defineProperty(ModelRep, key, {
-                        value: createLiteral(`"${name}".${toUnderscored(key)}`)
+                        value: {
+                            asLiteral: () => `"${name}".${toUnderscored(key)}`,
+                            toString: () => `"${name}".${toUnderscored(key)}`
+                        }
                     })
-                    key = key.substr(0, key.length-3)
-                    var relationTable = opts.a ? toTableName(opts.a) : toTableName( key);
-                    var relationName = `${key}`
+                    var relation = key.substr(0, key.length-3)
+                    var relationTable = opts.a ? toTableName(opts.a) : toTableName( relation);
+                    var relationName = `${relation}`
                     var Relation = models[relationTable]
-                    if(!Relation) throw Error(`Could not find relation "${key}"`)
+                    if(!Relation) throw Error(`Could not find relation "${relation}"`)
                     var alias = toForeignKeyName(toSingular(relationName))
-                    define(ModelRep, key, () => {
+                    define(ModelRep, relation, () => {
                         var relationCollection = createModelRep(relationName, Relation, models, 'first')
                         relationCollection.join = () => createLiteral(
                             `LEFT JOIN ${relationTable} as ${relationName} ON ${name}.${alias} = ${relationName}.id`
@@ -171,7 +195,10 @@ export async function query(callback) {
                     break
                 default:
                     Object.defineProperty(ModelRep, key, {
-                        value: createLiteral(`"${name}".${toUnderscored(key)}`)
+                        value: {
+                            asLiteral: () => `"${name}".${toUnderscored(key)}`,
+                            toString: () => `"${name}".${toUnderscored(key)}`
+                        }
                     })
                 break
             }
@@ -180,6 +207,9 @@ export async function query(callback) {
     }
 
     const resolveParameter = (parameter) => {
+        if(Array.isArray(parameter)){
+            return parameter.map( parameter => resolveParameter(parameter)).join("\n")
+        }
         if (parameter.asLiteral) {
             return parameter.asLiteral()
         }

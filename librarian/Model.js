@@ -1,7 +1,7 @@
 import { DBConnection } from './DBConnection'
 import { _shared, _public, _stream, _authorize, _session, _validate, _composes } from '../arbiter'
 import { datatypes } from './datatypes'
-import { toTableName, toCamelCase } from '../scribe'
+import { toTableName, toCamelCase, toCapitalized, toClassName, toForeignKeyName } from '../scribe'
 import { map, filter } from '../mason';
 import { EventEmitter } from '../herald';
 
@@ -10,6 +10,11 @@ const agent = new EventEmitter
 agent.on('*', (payload, event) => {
     console.log('EMITTED:', event)
 })
+
+
+const select = (self, includes) => {
+    
+}
 
 export class Model extends DBConnection {
 
@@ -27,45 +32,90 @@ export class Model extends DBConnection {
     }
 
     @_stream
-    static * find(id) {
+    static * find(id, includes = []) {
         yield this.nowAndOn(`updated.${id}`)
+        
         let results = yield this.query(({ sql, self }) => (sql`
-            SELECT ${self('*')} FROM ${self}
-            WHERE id=${id}
+            SELECT 
+                ${self(
+                    '*',
+                    ...includes.map( include => (
+                        self[include]('*')
+                    ))
+                )} 
+            FROM 
+                ${self}
+                ${includes.map( include => (
+                    self[include].join()
+                ))}
+            WHERE ${self.id}=${id}
         `))
         return results.first
     }
 
     @_stream
-    static *where(attributes) {
-        console.log(attributes)
+    static *where(attributes, includes = []) {
+
         yield this.nowAndOn('*')
+        if(includes.length) yield this.global.nowAndOn(
+            includes.map( include => `${this.classFor(include).name}.*`)
+        )
         return this.query(({ sql, self, each }) => sql`
-            SELECT ${self('*')} FROM ${self}
-            WHERE ${
-            Object.keys(attributes).length > 0 ?
-                each(attributes, (key, value) => {
-                    if(Array.isArray(value))
-                        return `${key} IN (${value.join(', ')})`
-                    else if (value === null)
-                        return `${key} IS NULL`
-                    else 
-                        return `${key}=${value}`
-                    }, 'AND'
-                ) :
-                1
-            }
+            SELECT 
+                ${self(
+                    '*',
+                    ...includes.map( include => (
+                        self[include]('*')
+                    ))
+                )} 
+            FROM 
+                ${self}
+                ${includes.map( include => (
+                    self[include].join()
+                ))}
+            WHERE 
+                ${Object.keys(attributes).length > 0 ?
+                    each(attributes, (key, value) => {
+                        if(Array.isArray(value) && value.length > 0 )
+                            return `${self[key]} IN (${value.join(', ')})`
+                        else if (value === null)
+                            return `${self[key]} IS NULL`
+                        else if(!Array.isArray(value))
+                            return `${self[key]}=${value}`
+                        else 
+                            return `false`
+                        }, 'AND'
+                    ) : 1}
         `)
     }
 
     @_stream
-    static *search(attributes) {
+    static *firstWhere(attributes, includes){
+        let result = yield this.where(attributes, includes)
+        return result.first
+    }
+
+    @_stream
+    static *search(attributes, includes = []) {
         yield this.nowAndOn('*')
         return this.query(({ sql, self, each }) => sql`
-            SELECT ${self('*')} FROM ${self}
-            WHERE ${each(attributes, (key, value) =>
-            `${key} LIKE ${value}`, 'OR'
-        )}`)
+            SELECT 
+                ${self(
+                    '*',
+                    ...includes.map( include => (
+                        self[include]('*')
+                    ))
+                )} 
+            FROM 
+                ${self}
+                ${includes.map( include => (
+                    self[include].join()
+                ))}
+            WHERE 
+                ${each(attributes, (key, value) =>
+                    `${key} LIKE ${value}`, 'OR'
+                )}
+        `)
     }
 
     static async truncate() {
@@ -87,6 +137,9 @@ export class Model extends DBConnection {
         Object.assign(record, attributes)
         return record
     }
+
+
+
 
     // ----------------------- INSTANCE METHODS ----------------------------------
 
@@ -194,7 +247,22 @@ export class Model extends DBConnection {
 
 
 
-    // -----------------------------------UTILS------------------------------------
+    // -----------------------------------UTILS-----------------------------------
+
+    static classFor(fieldName){
+        let instance = new this
+        let field = instance.fields[fieldName] || instance.fields[toForeignKeyName(fieldName)]
+        let relation
+        switch(field.alias){
+            case 'hasMany':
+                relation = field.metadata.of || fieldName
+            break;
+            case 'belongsTo':
+                relation = field.metadata.a || fieldName
+            break;
+        }
+        return this.models[toTableName(relation)]
+    }
 
 
     static Decorators = { ...datatypes, _shared, _public, _stream, _authorize, _session, _validate, _composes }

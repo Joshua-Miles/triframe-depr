@@ -114,7 +114,6 @@ export class UnSerializer {
                 let result = PENDING_VALUE
 
                 const handleResponse = function (response) {
-                    console.log("Received", name, response)
                     if (response && response.error) {
                         emit.throwError(response.message)
                     }
@@ -140,7 +139,6 @@ export class UnSerializer {
                             // console.log('Patching: ', print(patches))
                             result = snapshot(serializedResult)
                             //if(name == 'Document.editorSession') console.log(scopeMarker, 'applied', print(patches))
-                            console.log("Patching:", name, print(result), print(patches))
                             jsonpatch.applyPatch(result, patches)
                             // console.log('Patched:', print(result))
                             x = unSerializeDocument(result, onChange)
@@ -163,28 +161,22 @@ export class UnSerializer {
                 const reconcileOperations = function (ops) {
                     let changed = false
                     let reconciliationPatch = []
-
-                    let patchHashes = patches.map(stringify)
-                    let opHashes = ops.map(stringify)
-                    //if(name == 'Document.editorSession') console.log(scopeMarker, 'reconciling', print(patches))
-                    ops.forEach((op, opIndex) => {
-                        let patchIndex = patchHashes.indexOf(opHashes[opIndex])
-                        if (patchIndex > -1) {
-                            // console.log("HERE-------------------------------------------------------------")
-                            delete patches[patchIndex]
-                        }
-                        else changed = true
+                    ops.forEach((op) => {
                         reconciliationPatch.push(op)
+                        for(let index in patches){
+                            let patch = patches[index];
+                            if(op.op == 'remove' && patch.path.startsWith(op.path)){
+                                delete patches[index]
+                            }
+                            if(JSON.stringify(op) == JSON.stringify(patch)){
+                                delete patches[index]
+                                return;
+                            }
+                        }
+                        changed = true
                     })
-
                     jsonpatch.applyPatch(serializedResult, reconciliationPatch)
-                    // if(name == 'Document.editorSession') console.log(scopeMarker, 'rebased', 
-                    //     print(reconciliationPatch)
-                    // )
-                    // console.log('Rebasing:', print(reconciliationPatch))
-                    //if(name == 'Document.editorSession') console.log(scopeMarker, 'reconciled pre filter', print(patches))
                     serializer.patches[name] = patches = patches.filter(x => x)
-                    //if(name == 'Document.editorSession') console.log(scopeMarker, 'reconciled', print(patches))
                     return changed
                 }
 
