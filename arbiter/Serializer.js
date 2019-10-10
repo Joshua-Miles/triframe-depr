@@ -108,7 +108,7 @@ export class Serializer {
         } else {
             const Type = this.CurrentType;
             const currentPlacement = this.currentPlacement;
-            agent.on('call', async ({ socket, args, id, patches, includes, attributes, session, respond, emit }) => {
+            agent.on('call', async ({ socket, args, id, patches, includes, attributes, session, emit }) => {
 
                 // Create a unique identifier for this method call
                 let hash = JSON.stringify({ args, id })
@@ -133,7 +133,7 @@ export class Serializer {
                         }
                     }
                     let serialized = this.serializeDocument(document, session)
-                    respond(serialized)
+                    emit(serialized)
                     
                     // Emit updates to the requestor
                     if (pipe && pipe.observe) {
@@ -167,7 +167,7 @@ export class Serializer {
                     let authorizer, message;
                     if (typeof authorize === 'function') authorizer = authorize, message = 'You are not authorized for the requested action'
                     else authorizer = authorize.unless, message = authorize.message
-                    if (!authorizer(session)) return respond({ error: true, message })
+                    if (!authorizer(session)) return emit({ error: true, message })
                 }
 
                 // Check for a cached result
@@ -186,7 +186,8 @@ export class Serializer {
                     if (err instanceof SessionRequest) {
                         err.callback(session)
                     } else {
-                        respond({ error: true, message: err.message })
+                        console.log("___________________________IN HERE___________________")
+                        emit({ error: true, message: err.message })
                     }
                 })
 

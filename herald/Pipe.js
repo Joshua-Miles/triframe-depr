@@ -34,11 +34,18 @@ export class Pipe {
         this.observers = this.observers.filter(observer => observer != callback)
     }
 
-    then(callback, errorHandler = null) {
-        if (errorHandler) this.catch(errorHandler)
-        if (this.currentValue) callback(this.currentValue)
+    then(callback, errorHandler = () => void(0)) {
+        if (this.currentValue) this.currentValue instanceof Error
+                                    ? errorHandler(this.currentValue)
+                                    : callback(this.currentValue)
+        let catchHandler = (err) => {
+            this.errorHandlers = this.errorHandlers.filter( handler => handler != catchHandler)
+            errorHandler(err)
+        }
+        this.catch(catchHandler)
         let resolve = () => resolve = true
         this.listeners.push(async (...args) => {
+            this.errorHandlers = this.errorHandlers.filter( handler => handler != catchHandler)
             await callback(...args)
             resolve()
         })
@@ -53,11 +60,12 @@ export class Pipe {
         this.cancelationHandlers.push(callback)
     }
 
-    apply(callback) {
+    apply(callback, errorHandler = () => void(0)) {
         if (this.currentValue) {
-            callback(this.currentValue)
+            if(this.currentValue instanceof Error) errorHandler(this.currentValue)
+            else callback(this.currentValue)
         } else {
-            this.then(callback);
+            this.then(callback, errorHandler);
             this.alreadyInitialized = true;
             this[execute]()
         }
@@ -75,6 +83,7 @@ export class Pipe {
     }
 
     throwError = (err) => {
+        this.currentValue = err
         this.errorHandlers.forEach(handler => handler(err))
     }
 
@@ -85,8 +94,8 @@ export class Pipe {
         this.executions.push(abortThis)
 
         let emit = (...args) => {
-            if(aborted) return
-            while(this.executions.length && this.executions[0] != abortThis){
+            if (aborted) return
+            while (this.executions.length && this.executions[0] != abortThis) {
                 let abort = this.executions.shift()
                 abort()
             }
@@ -110,39 +119,52 @@ export class Pipe {
                 const { isPipe, isPromise } = this.constructor
                 const { cached, cache } = this
                 const cachedValue = cached(value)
+            
 
                 let next;
                 if (done && value === undefined) return
                 if (done) next = (...args) => !aborted && emit(...args)
                 else next = (...args) => !aborted && moveCursor(...args)
 
-                if (cachedValue) await next(cachedValue.currentValue);
-                else if (isPipe(value)) { 
-                    value.apply(result => { 
-                        cache(value); 
-                        next(result); 
-                    }); 
-                    value.catch(this.throwError)
+                if (cachedValue) cachedValue.currentValue instanceof Error 
+                                        ? process(cursor.throw(cachedValue.currentValue))
+                                        : await next(cachedValue.currentValue);
+                else if (isPipe(value)) {
+                    value.apply(result => {
+                        cache(value);
+                        next(result);
+                    }, err => {
+                        cache(value)
+                        process(cursor.throw(err))
+                    } );
                 }
-                else if (isPromise(value)) { 
+                else if (isPromise(value)) {
                     await value
-                            .then(next)
-                            .catch(this.throwError)
+                        .then(next)
+                        .catch(err => process(cursor.throw(err)))
                 }
                 else await next(value);
             })
         }
 
-        const moveCursor = result => process(cursor.next(result))
+        const moveCursor = result => {
+            try {
+                result = cursor.next(result)
+                process(result)
+            } catch (err) {
+                this.throwError(err)
+            }
+        }
 
         if (cursor && typeof cursor.next == 'function') await moveCursor();
         else await process({ value: cursor, done: true })
     }
 
     cache = pipe => {
-        let observer = () => {
+        let observer = (err) => {
             if ((this.observers.length || this.listeners.length) && !this.isCanceled) this[execute]()
         }
+        pipe.catch(observer)
         pipe.observe(observer)
         this.onCancel(() => pipe.unobserve(observer))
         this.dependencies.push(pipe)

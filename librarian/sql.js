@@ -2,7 +2,7 @@ import { each, index, filter } from "../mason";
 import { toUnderscored, toCamelCase, toCapitalized, toSingular, toForeignKeyName, toTableName } from "../scribe";
 import { Collection } from "./Collection";
 
-export async function query(callback) {
+export async function query(callback, { disableLogging = false } = {}) {
 
     const database = this.client;
     const types = this.types;
@@ -14,7 +14,7 @@ export async function query(callback) {
         let library = createLibrary(types)
         let query = callback(library)
         if(group && !query.includes('GROUP BY')) query = `${query} GROUP BY ${group}`
-        console.log(query)
+        if(!disableLogging) console.log(query)
         let response = await database.query(query, escaped)
         let result = Collection.fromArray(response.rows.map( (row, index) => {
             let document = crawl(row.json_build_object || row) 

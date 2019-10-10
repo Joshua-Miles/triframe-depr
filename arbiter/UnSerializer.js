@@ -115,7 +115,7 @@ export class UnSerializer {
 
                 const handleResponse = function (response) {
                     if (response && response.error) {
-                        emit.throwError(response.message)
+                        return emit.throwError(new Error(response.message))
                     }
                     if (serializedResult === PENDING_VALUE || !serializedResult) {
                         serializedResult = response

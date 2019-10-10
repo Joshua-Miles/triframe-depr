@@ -31,12 +31,10 @@ const Main = ({ children, iconSets = ['MaterialIcons'], url = '' }) => {
             let { types, agent } = new UnSerializer(inter)
             agent.on('*', (payload, action) => {
                 let id = counter++
-                io.emit('message', { payload, action, id }, object => {
-                    payload.respond(object)
-                    io.on(id, result => {
-                        payload.respond(result)
-                    })
+                io.on(id, result => {
+                    payload.respond(result)
                 })
+                io.emit('message', { payload, action, id })
             })
             saveModels(types)
         })
@@ -177,6 +175,8 @@ let ConnectedComponent = withRouter(({ props = [], models, Component, history, m
                 restartUse()
                 dispatch({ jsx })
             })
+            // TODO: A thing here?
+            pipe.catch(err => console.log('well', err))
             return () => pipe && pipe.destroy()
         }
         return restart()

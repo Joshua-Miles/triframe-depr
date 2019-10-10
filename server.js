@@ -51,9 +51,9 @@ export default class Server {
             const { session, token } = this.loadSession(socket.handshake.query.token, socket.id)
             socket.emit('token', token)
             socket.emit('interface', serializer.interface)
-            socket.on('message', ({ action, payload, id }, respond) => {
+            socket.on('message', ({ action, payload, id }) => {
                 serializer.agent.emit(action, {
-                    ...payload, socket, session, respond, emit: (result) => {
+                    ...payload, socket, session,  emit: (result) => {
                         socket.emit(id, result)
                     }
                 })
