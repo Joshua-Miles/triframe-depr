@@ -64,10 +64,10 @@ const Main = ({ children, iconSets = ['MaterialIcons'], url = '' }) => {
                         visible={error !== false}
                         onDismiss={() => displayError(false)}
                         action={{
-                        label: 'Dismiss',
-                        onPress: () => {
-                            displayError(false)
-                        }
+                            label: 'Dismiss',
+                            onPress: () => {
+                                displayError(false)
+                            }
                         }}
                     >
                         {error.message}
@@ -148,7 +148,8 @@ const createUseContext = models => context => {
         pipe = cached.pipe
     } else {
         let [use, restartUse] = createUse()
-        let payload = { models, use }
+        let useContext = createUseContext(models)
+        let payload = { models, use, useContext }
         pipe = new Pipe(() => context(payload))
         pipe.observe(() => {
             restartUse()

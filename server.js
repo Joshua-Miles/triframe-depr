@@ -95,6 +95,7 @@ export default class Server {
 
     saveSession(token, session) {
         let sessionData = { ...session };
+        console.log(sessionData.currentUser)
         delete sessionData.destroy
         fs.writeFileSync(`${SESSIONS_PATH}/${token}.json`, JSON.stringify(this.serializer.serializeDocument(sessionData)))
     }
