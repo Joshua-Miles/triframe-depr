@@ -186,7 +186,6 @@ export class Serializer {
                     if (err instanceof SessionRequest) {
                         err.callback(session)
                     } else {
-                        console.log("___________________________IN HERE___________________")
                         emit({ error: true, message: err.message })
                     }
                 })

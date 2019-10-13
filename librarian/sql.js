@@ -207,6 +207,9 @@ export async function query(callback, { disableLogging = false } = {}) {
     }
 
     const resolveParameter = (parameter) => {
+        if(parameter === undefined){
+            return undefined
+        }
         if(Array.isArray(parameter)){
             return parameter.map( parameter => resolveParameter(parameter)).join("\n")
         }

@@ -198,6 +198,7 @@ const _composes = function (...parents) {
                 descriptor: {},
                 initializer() {
                     this.fields = { ...this.fields, ...instance.fields}
+                    this.query = this.constructor.query.bind(this.constructor)
                     delete this[temp]
                     each(instanceMethods, (method) => {
                         let propertyName = `${this.constructor.name}#${method}`
