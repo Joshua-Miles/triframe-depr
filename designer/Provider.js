@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { withRouter } from 'react-router'
 import { Pipe, EventEmitter } from '../herald';
 import { Platform, Router, Title } from './index'
-import { Provider as PaperProvider } from 'react-native-paper'
+import { Provider as PaperProvider, Snackbar } from 'react-native-paper'
 import { crawl } from '../mason';
 import { View } from 'react-native'
 
@@ -16,7 +16,11 @@ export const Provider = (props) => (
     </Router>
 )
 
+let displayError;
+
 const Main = ({ children, iconSets = ['MaterialIcons'], url = '' }) => {
+    let error;
+    ([ error, displayError ] = useState(false))
     let [models, saveModels] = useState({ areReady: false })
     useEffect(() => {
         let counter = 0;
@@ -56,6 +60,18 @@ const Main = ({ children, iconSets = ['MaterialIcons'], url = '' }) => {
             `}</style>
                 ) : null}
                 <View style={{ height: '100vh' }}>
+                    <Snackbar
+                        visible={error !== false}
+                        onDismiss={() => displayError(false)}
+                        action={{
+                        label: 'Dismiss',
+                        onPress: () => {
+                            displayError(false)
+                        }
+                        }}
+                    >
+                        {error.message}
+                    </Snackbar>    
                     {children}
                 </View>
             </PaperProvider>
@@ -168,8 +184,24 @@ let ConnectedComponent = withRouter(({ props = [], models, Component, history, m
             let useHistory = () => new Pipe(() => ({ history, match, location }))
             let redirect = path => history.push(path)
 
+            let defaultErrorHandler = (err) => {
+                displayError(err)
+            }
 
-            let payload = { models, props, whileLoading, useContext, useHistory, use, redirect }
+            let handleError = defaultErrorHandler
+
+            let onError = callback => handleError = err => callback(err, defaultErrorHandler)
+
+            let catchErrors = callback => (...args) => {
+                try {
+                    let result = callback(...args)
+                    if(result instanceof Promise) result.catch(handleError)
+                } catch(err){
+                    handleError(err)
+                }
+            }
+
+            let payload = { models, props, whileLoading, onError, useContext, useHistory, use, redirect, catchErrors }
             pipe = new Pipe(() => Component(payload), payload)
             pipe.observe(jsx => {
                 restartUse()

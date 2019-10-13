@@ -166,9 +166,7 @@ export class Model extends DBConnection {
         const { attributes } = this;
         if (attributes.id) {
             delete attributes.id
-            console.log(this.tableName)
             await this.query(({ sql, self, each }) => {
-                console.log(self)
                 return sql`
                     UPDATE ${self} 
                     SET ${each(attributes, (key, value) => (

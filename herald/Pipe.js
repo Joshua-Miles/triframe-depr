@@ -119,6 +119,14 @@ export class Pipe {
                 const { isPipe, isPromise } = this.constructor
                 const { cached, cache } = this
                 const cachedValue = cached(value)
+
+                const throwError = err => {
+                    if(cursor.throw){
+                        return process(cursor.throw(err))
+                    } else {
+                        return this.throwError(err)
+                    }
+                }
             
 
                 let next;
@@ -127,7 +135,7 @@ export class Pipe {
                 else next = (...args) => !aborted && moveCursor(...args)
 
                 if (cachedValue) cachedValue.currentValue instanceof Error 
-                                        ? process(cursor.throw(cachedValue.currentValue))
+                                        ? throwError(cachedValue.currentValue)
                                         : await next(cachedValue.currentValue);
                 else if (isPipe(value)) {
                     value.apply(result => {
@@ -135,13 +143,13 @@ export class Pipe {
                         next(result);
                     }, err => {
                         cache(value)
-                        process(cursor.throw(err))
+                        throwError(err)
                     } );
                 }
                 else if (isPromise(value)) {
                     await value
                         .then(next)
-                        .catch(err => process(cursor.throw(err)))
+                        .catch(err => throwError(err))
                 }
                 else await next(value);
             })
