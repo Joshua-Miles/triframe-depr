@@ -1,5 +1,5 @@
 // Native and Platform Components
-import { View, TouchableOpacity, Platform } from 'react-native'
+import { View, TouchableOpacity, Platform, ScrollView } from 'react-native'
 import { Route, Switch, Redirect } from 'react-router'
 import { Router, Link } from './platform'
 
@@ -36,7 +36,7 @@ export {
 
     Icon,
 
-    TouchableOpacity,
+    TouchableOpacity, ScrollView,
 
     // Deprecate
     TextEditor,

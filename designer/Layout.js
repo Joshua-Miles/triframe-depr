@@ -4,9 +4,9 @@ import { each } from "triframe/mason";
 import { Text } from '.'
 
 
-export const Container = ({ children }) => (
+export const Container = ({ children, style, slim }) => (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{
-        flexGrow: 1, display: 'flex', margin: 50
+        flexGrow: 1, display: 'flex', margin: slim ? 0 : 50, ...style, 
     }}>
         {renderChildren(children)}
     </ScrollView>
@@ -22,12 +22,13 @@ export const Section = ({ children, inline, style }) => (
     </View>
 )
 
-export const Area = ({ children, inline= false, alignX = 'left', alignY = 'left' }) => (
+export const Area = ({ children, inline= false, alignX = 'left', alignY = 'left', style }) => (
     <View style={{
         justifyContent: inline ? alignmentMap[alignX] :  alignmentMap[alignY],
         alignItems:  inline ? alignmentMap[alignY] : alignmentMap[alignX],
         flexDirection: inline ? 'row' : 'column',
-        flex: 1
+        flex: 1,
+        ...style
     }}>
         {renderChildren(children)}
     </View>
@@ -81,7 +82,8 @@ export const createGrid = sizes => {
                 styles = { 
                     margin: `${gutter}%`,
                     flex: props.justify ? 1 : null, 
-                    width: `${width}%`
+                    width: `${width}%`,
+                    height: '100%'
                 }
             break;
         }

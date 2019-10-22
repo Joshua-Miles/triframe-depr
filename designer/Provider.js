@@ -202,11 +202,14 @@ let ConnectedComponent = withRouter(({ props = [], models, Component, history, m
                 }
             }
 
-            let payload = { models, props, whileLoading, onError, useContext, useHistory, use, redirect, catchErrors }
+            let runAfterRender
+            let afterRender = callback => runAfterRender = callback
+
+            let payload = { models, props, whileLoading, onError, useContext, useHistory, use, redirect, catchErrors, afterRender }
             pipe = new Pipe(() => Component(payload), payload)
             pipe.observe(jsx => {
                 restartUse()
-                dispatch({ jsx })
+                dispatch({ jsx, runAfterRender })
             })
             // TODO: A thing here?
             pipe.catch(err => console.log('well', err))
@@ -214,5 +217,8 @@ let ConnectedComponent = withRouter(({ props = [], models, Component, history, m
         }
         return restart()
     }, [models.areReady, ...propsArray])
+    useEffect( () => {
+        if(typeof data.runAfterRender == 'function') data.runAfterRender()
+    })
     return data.jsx
 })
