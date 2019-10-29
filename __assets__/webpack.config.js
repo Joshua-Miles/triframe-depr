@@ -9,8 +9,10 @@ fs.readdirSync('node_modules')
   .forEach(function(mod) {
     nodeModules[mod] = 'commonjs ' + mod;
   });
-
   nodeModules['fs'] = 'commonjs ' + 'fs';
+  nodeModules['http'] = 'commonjs ' + 'http';
+  nodeModules['util'] = 'commonjs ' + 'util';
+  nodeModules['formidable'] = 'commonjs ' + 'formidable';
 module.exports = {
   entry: './src/Server.js',
   mode: "development",
