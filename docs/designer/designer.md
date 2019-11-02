@@ -222,46 +222,200 @@ export const App = () => (
 
  ### `Text`
 
-Text, 
+  Unstyled Text
+
+```jsx
+import React from 'react'
+import { Container, Text } from 'triframe/designer'
+
+export const App = () => (
+    <Container>
+    	<Text>Hello World</Text>
+    </Container>
+)
+```
+
+##### Props
+
+> None
+
+
 
 ### `Title`
 
-Title
+  A page title
+
+```jsx
+import React from 'react'
+import { Container, Title } from 'triframe/designer'
+
+export const App = () => (
+    <Container>
+    	<Title>Hello World</Title>
+    </Container>
+)
+```
+
+##### Props
+
+> None
+
+
 
 ### `Heading`
 
-Heading
+  A section heading
+
+```jsx
+import React from 'react'
+import { Container, Heading } from 'triframe/designer'
+
+export const App = () => (
+    <Container>
+    	<Heading>Hello World</Heading>
+    </Container>
+)
+```
+
+##### Props
+
+> None
 
 ### `Subheading`
 
-Subheading
+  A subsection heading
+
+```jsx
+import React from 'react'
+import { Container, Subheading } from 'triframe/designer'
+
+export const App = () => (
+    <Container>
+    	<Subheading>Hello World</Subheading>
+    </Container>
+)
+```
+
+##### Props
+
+> None
 
 ### `Paragraph`
 
-Paragraph
+  A paragraph
+
+```jsx
+import React from 'react'
+import { Container, Paragraph } from 'triframe/designer'
+
+export const App = () => (
+    <Container>
+    	<Paragraph>Hello World</Paragraph>
+    </Container>
+)
+```
+
+##### Props
+
+> None
+
+
 
 ### `Caption`
 
-Caption
+  A caption
+
+```jsx
+import React from 'react'
+import { Container, Caption } from 'triframe/designer'
+
+export const App = () => (
+    <Container>
+    	<Caption>Hello World</Caption>
+    </Container>
+)
+```
+
+##### Props
+
+> None
 
 
 
  ## Buttons
 
- Button, BubbleButton, ToggleButton, FileInput,
+### `Button`
+
+ https://callstack.github.io/react-native-paper/button.html 
+
+### `BubbleButton`
+
+FAB:  https://callstack.github.io/react-native-paper/fab.html 
+
+### `ToggleButton`
+
+ https://callstack.github.io/react-native-paper/toggle-button.html 
 
 
 
  ## Forms
 
- TextInput, TextField, HelperText, ToggleSwitch,
+ ### `TextField`
+
+A basic space for text input
+
+### `TextInput`
+
+ https://callstack.github.io/react-native-paper/text-input.html 
+
+### `FileInput`
+
+
+
+### `HelperText`
+
+ https://callstack.github.io/react-native-paper/helper-text.html 
+
+### `ToggleSwitch`
+
+ https://callstack.github.io/react-native-paper/switch.html 
+
+### `RadioButton`
+
+ https://callstack.github.io/react-native-paper/radio-button.html 
 
 
 
  ## Material
 
- Chip, Card, List, Badge
+ ### `Chip`
+
+ https://callstack.github.io/react-native-paper/chip.html 
+
+### `Card`
+
+ https://callstack.github.io/react-native-paper/card.html 
+
+### `List `
+
+ https://callstack.github.io/react-native-paper/list-item.html 
+
+### `Badge`
+
+ https://callstack.github.io/react-native-paper/badge.html 
+
+
 
 ## Misc
 
- Drawer, Modal, Appbar,
+### `Appbar`
+
+ https://callstack.github.io/react-native-paper/appbar.html 
+
+### `Drawer`
+
+ https://callstack.github.io/react-native-paper/drawer-item.html 
+
+### `Modal `
+
+ https://callstack.github.io/react-native-paper/modal.html 
