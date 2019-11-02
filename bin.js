@@ -15,7 +15,7 @@ program
         console.log('Starting...')
         exec('npm ls -g react-native')
             .catch(() => {
-                console.log('Instaling React Native...')
+                console.log('Installing React Native...')
                 return exec('npm install -g react-native')
             })
             .then(async () => {
