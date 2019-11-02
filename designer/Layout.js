@@ -58,8 +58,6 @@ export const createGrid = sizes => {
     
         const { width, height } = useScreenSize(props)
 
-        const { right, center, inline } = props
-
         let size = 1
         each(sizes, ( currentSize, threshold) => {
             if(props[currentSize] && ( !size || width > threshold ) ){

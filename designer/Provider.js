@@ -51,13 +51,14 @@ const Main = ({ children, iconSets = ['MaterialIcons'], url = '' }) => {
             <PaperProvider>
                 {Platform.OS === 'web' ? (
                     <style type="text/css">{`
-                ${iconSets.map(iconSet => (
-                        `@font-face {
-                        font-family: ${iconSet};
-                        src: url(${require(`react-native-vector-icons/Fonts/${iconSet}.ttf`)}) format('truetype');
-                    }`
-                    )).join("\n")}
-            `}</style>
+                        ${iconSets.map(iconSet => (
+                            `@font-face {
+                                font-family: ${iconSet};
+                                src: url(${require(`react-native-vector-icons/Fonts/${iconSet}.ttf`)}) format('truetype');
+                            }`
+                        )).join("\n")}
+                        `}
+                    </style>
                 ) : null}
                 <View style={{ height: '100vh' }}>
                     <Snackbar
@@ -182,7 +183,7 @@ let ConnectedComponent = withRouter(({ props = [], models, Component, history, m
 
             let [use, restartUse] = createUse()
             let useContext = createUseContext(models)
-            let useHistory = () => new Pipe(() => ({ history, match, location }))
+            let useRouter = () => new Pipe(() => ({ history, match, location }))
             let redirect = path => history.push(path)
 
             let defaultErrorHandler = (err) => {
@@ -205,7 +206,7 @@ let ConnectedComponent = withRouter(({ props = [], models, Component, history, m
             let runAfterRender
             let afterRender = callback => runAfterRender = callback
 
-            let payload = { models, props, whileLoading, onError, useContext, useHistory, use, redirect, catchErrors, afterRender }
+            let payload = { models, props, redirect, use, useContext, useRouter, whileLoading, onError, catchErrors, afterRender }
             pipe = new Pipe(() => Component(payload), payload)
             pipe.observe(jsx => {
                 restartUse()
