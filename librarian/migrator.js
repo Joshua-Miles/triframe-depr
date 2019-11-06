@@ -130,7 +130,7 @@ const selectSchema = () => (`
         con.confdeltype as on_delete,
         con.confupdtype as on_update,
         attr.attnotnull as not_null,
-        de.adsrc as defaults
+        pg_get_expr(de.adbin, de.adrelid) as defaults
     FROM
         pg_class as tab
         JOIN pg_catalog.pg_namespace as n 
@@ -296,8 +296,8 @@ const patchColumnAttributes = (columnName, currentSchema, updatedSchema) => {
     if(columnName == 'id') return []
     let { added, removed, different } = comparisonOf(currentSchema, updatedSchema)
     let commands = new Array
-    if( different('type') ){ console.log(currentSchema.type, updatedSchema.type);commands.push( setType(columnName, updatedSchema.type) )}
-    if( updatedSchema.defaults && different('defaults') )commands.push( setColumnDefault(columnName, updatedSchema.defaults) )
+    if( different('type') ) commands.push( setType(columnName, updatedSchema.type) )
+    if( different('defaults') )  commands.push( setColumnDefault(columnName, updatedSchema.defaults) )
     if( removed('defaults') ) commands.push( dropColumnDefault(columnName) )
     commands = [ ...commands, patchColumnConstraints(columnName, currentSchema.constraints, updatedSchema.constraints)]
     return commands.filter( a => a.length).join(', ')
@@ -319,12 +319,12 @@ const patchColumnConstraints = (columnName, currentSchema, updatedSchema) => {
 }
 
 const comparisonOf = function(thing1, thing2){
-    let removed = key => thing1[key] && !thing2[key]
-    let added = key => !thing1[key] && thing2[key]
-    let different = key => thing1[key] != thing2[key] && serialize(thing1[key]) != serialize(thing2[key])
+    let removed = key => thing1[key] && thing2[key] === undefined
+    let added = key => thing1[key] === undefined && thing2[key]
+    let different = key => {
+        if(thing2[key] instanceof Date) return thing1[key] != 'now()'
+        if(typeof thing2[key] == 'boolean') return (thing1[key] === 'true') != thing2[key]
+        return thing1[key] != thing2[key] 
+    }
     return { added, removed, different }
-}
-
-const serialize = obj => {
-    return JSON.stringify(Object.values(map(obj, (key, value) => `${key}:${value instanceof Date ? 'NOW()' : value}`)).sort())
 }

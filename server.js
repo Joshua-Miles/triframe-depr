@@ -24,10 +24,11 @@ if (!fs.existsSync(UPLOADS_PATH)) {
 function loadModels(r) {
     const models = {}
     r.keys().forEach(key => {
-        let [Model] = key.substr(2).split(/\.|\//)
+        if(key.includes('__')) return
+        let path = key.replace('.js', '').split('/')
+        let Model = path.pop()
         let module = r(key)
         if (module[Model]) models[Model] = module[Model]
-        if (module._default && key.includes(`${Model}/index`)) models[Model] = module._default
     });
     return models
 }

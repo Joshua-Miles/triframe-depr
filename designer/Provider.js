@@ -8,7 +8,7 @@ import { Provider as PaperProvider, Snackbar } from 'react-native-paper'
 import { crawl } from '../mason';
 import { View } from 'react-native'
 
-const Model = React.createContext({ areReady: false })
+export const Model = React.createContext({ areReady: false })
 
 export const Provider = (props) => (
     <Router>
@@ -40,7 +40,7 @@ const Main = ({ children, iconSets = ['MaterialIcons'], url = '' }) => {
                 })
                 io.emit('message', { payload, action, id })
             })
-            saveModels(types)
+            saveModels({ ...types, url})
         })
         io.on('disconnect', () => {
             window.location.reload()
