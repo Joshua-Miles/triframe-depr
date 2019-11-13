@@ -20,6 +20,10 @@ const types = {
         type: 'int8'
     },
 
+    json: {
+        type: 'json'
+    },
+
     hasOne: {
         type: 'virtual'
     },

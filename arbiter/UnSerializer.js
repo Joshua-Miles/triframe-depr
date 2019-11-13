@@ -184,13 +184,15 @@ export class UnSerializer {
                 const optimizePatches = patches => {
                     //return patches
                     let bin = {}
+                    let temp = serializedResult
                     patches.forEach(patch => {
                         if (bin[patch.path] && bin[patch.path].op == 'add' && patch.op == 'remove') {
                             delete bin[patch.path]
                         } else {
-                            let temp = snapshot(serializedResult)
+                            let previous = temp
+                            temp = snapshot(temp)
                             jsonpatch.applyPatch(temp, [patch])
-                            let patches = compare(serializedResult, temp)
+                            let patches = compare(previous, temp)
                             let changesBase = !!patches.length
                             if (changesBase) {
                                 // console.log('CHANGES:', patches)

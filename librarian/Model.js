@@ -34,7 +34,9 @@ export class Model extends DBConnection {
     @_stream
     static * find(id, includes = []) {
         yield this.nowAndOn(`updated.${id}`)
-
+        if (includes.length) yield this.global.nowAndOn(
+            includes.map(include => `${this.classFor(include).name}.*`)
+        )
         let results = yield this.query(({ sql, self }) => (sql`
             SELECT 
                 ${self(
