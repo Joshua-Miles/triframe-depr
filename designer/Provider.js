@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { withRouter } from 'react-router'
 import { Pipe, EventEmitter } from '../herald';
 import { Platform, Router, Title } from './index'
-import { Provider as PaperProvider, Snackbar } from 'react-native-paper'
+import { Provider as PaperProvider, Snackbar, Portal } from 'react-native-paper'
 import { crawl } from '../mason';
 import { View } from 'react-native'
 
@@ -60,6 +60,7 @@ const Main = ({ children, iconSets = ['MaterialIcons'], url = '' }) => {
                         `}
                     </style>
                 ) : null}
+                <Portal.Host />
                 <View style={{ height: '100vh' }}>
                     <Snackbar
                         visible={error !== false}

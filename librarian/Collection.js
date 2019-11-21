@@ -57,8 +57,12 @@ export class Collection {
 
     @_shared
     get last(){
-        let index = this.indexes[this.indexes.length-1]
-        return this[index]
+        let result = null
+        const { ordered } = this
+        for(let i in ordered){
+            result = ordered[i]
+        }
+        return result
     }
 
     @_shared

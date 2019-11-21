@@ -257,6 +257,7 @@ export class Model extends DBConnection {
         let instance = new this
         let field = instance.fields[fieldName] || instance.fields[toForeignKeyName(fieldName)]
         let relation
+        if(!field) console.log(fieldName)
         switch (field.alias) {
             case 'hasMany':
                 relation = field.metadata.of || fieldName

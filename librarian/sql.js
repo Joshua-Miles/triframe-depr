@@ -14,7 +14,8 @@ export async function query(callback, { disableLogging = false } = {}) {
         let library = createLibrary(types)
         let query = callback(library)
         if(group && !query.includes('GROUP BY')) query = `${query} GROUP BY ${group}`
-        if(!disableLogging) console.log(query)
+        
+        if(!disableLogging) console.log(query, escaped)
         let response = await database.query(query, escaped)
         let result = Collection.fromArray(response.rows.map( (row, index) => {
             let document = crawl(row.json_build_object || row) 
@@ -50,9 +51,10 @@ export async function query(callback, { disableLogging = false } = {}) {
             let collection = new Collection;
             collection.__of__ = record.__of__
             collection.__presets__ = record.__presets__
-            record.forEach( record => {
+            record.forEach( (record) => {
                 if(record.id !== null){
-                    collection.push(crawl(record))
+                    let result = crawl(record)
+                    collection.push(result)
                 }
             })
             return collection;
@@ -109,7 +111,12 @@ export async function query(callback, { disableLogging = false } = {}) {
 
     const createModelRep = (name, Model, models, $as) => {
         let instance = new Model 
-        const ModelRep = function(...fields) {
+        const ModelRep = function(options, ...fields) {
+            if(options.__proto__ != Object.prototype){
+                fields.unshift(options)
+                options = {}
+            }
+            const { orderBy } = options
             let select = fields.map((field, index) => {
                 if(field == '*'){
                     return Object.keys(filter(instance.fields, (key, field) => field.type != 'virtual' && key != 'id')).map( (key) => {
@@ -131,8 +138,10 @@ export async function query(callback, { disableLogging = false } = {}) {
             })
             select = select.join(',')
            
-            if($as == 'collection') select = `'${name}', array_agg(json_build_object('id', "${name}".id,\n         '__class__', '${Model.name}', \n        ${select}))`
-            else if($as == 'first') select = `'${name}', array_agg(json_build_object('id', "${name}".id,\n    '__isOnly__', 'true',     '__class__', '${Model.name}', \n        ${select}))`
+            const orderClause = orderBy ? `ORDER BY ${orderBy}` : ''
+
+            if($as == 'collection') select = `'${name}', array_agg(json_build_object('id', "${name}".id,\n         '__class__', '${Model.name}', \n        ${select}) ${orderClause})`
+            else if($as == 'first') select = `'${name}', array_agg(json_build_object('id', "${name}".id,\n    '__isOnly__', 'true',     '__class__', '${Model.name}', \n        ${select}) ${orderClause})`
             else  select = `json_build_object('id', "${name}".id,\n         '__class__', '${Model.name}', \n        ${select})`
 
             return createLiteral(select)
@@ -237,40 +246,6 @@ export async function query(callback, { disableLogging = false } = {}) {
         return `$${counter++}`
     }
 
-
-    let formatResult = (record, result, index) => {
-        let next = {}
-        each(record, ( key, value ) => {
-            let [ first, ...rest ] = key.split('.')
-            if(rest.length){
-                next[first] = next[first] || {}
-                next[first][rest.join('.')] = value
-            } else {
-                if(!first.startsWith('__')) first = toCamelCase(first)
-                result[first] = value
-            }
-        })
-        each(next, (key, value) => {
-            if(key === '[i]'){
-                let lookahead = {}
-                formatResult(value, lookahead, index)
-                if(lookahead.id === null) return
-                let Model = types[lookahead.__class__] || Object
-                result[lookahead.id] = result[lookahead.id] || new Model;
-                result[lookahead.id].__index__ = result[lookahead.id].__index__ || index
-                formatResult(value, result[lookahead.id], index)
-            } else {
-                let lookahead = {}
-                formatResult(value, lookahead, index)
-                if(lookahead.id === null) return
-                if(!key.startsWith('__')) key = toCamelCase(key)
-                if(lookahead.__class__ && typeof types[lookahead.__class__] == 'function') next = new types[lookahead.__class__]
-                else next = containerFor(value)
-                result[key] = result[key] ||  next
-                formatResult(value, result[key], index)
-            }
-        })
-    }
 
     try {
 

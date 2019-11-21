@@ -60,6 +60,7 @@
     "postcss-safe-parser": "4.0.1",
     "react-app-polyfill": "^0.2.0",
     "react-art": "^16.8.6",
+    "react-datepicker": "^2.10.0",
     "react-dev-utils": "^7.0.1",
     "react-native-drawer-layout": "^2.0.0",
     "react-native-paper": "^2.16.0",

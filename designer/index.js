@@ -1,10 +1,10 @@
 // Native and Platform Components
-import { View, TouchableOpacity, Platform, ScrollView } from 'react-native'
+import { View, TouchableOpacity, Platform, ScrollView, Animated, PanResponder, Modal as LegacyModal } from 'react-native'
 import { Route, Switch, Redirect } from 'react-router'
 import { Router, Link } from './platform'
 
 // Native Paper Components
-import { Appbar, Avatar, Menu, Divider, Badge, RadioButton, Snackbar } from 'react-native-paper';
+import { Appbar, Avatar, Menu, Divider, Badge, RadioButton, Snackbar, Portal } from 'react-native-paper';
 
 // 
 import { Provider, tether } from './Provider'
@@ -19,8 +19,8 @@ import { Button, BubbleButton, ToggleButton, FileInput } from './Button'
 import { Text, Title, Heading, Subheading, Paragraph, Caption } from './Typography'
 import { TextInput, PasswordInput, TextField, HelperText, ToggleSwitch } from './Form'
 
-
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons'
+import { DateTimeInput } from './DateTimeInput/index.web';
 
 
 const { Grid, Column } = createGrid({
@@ -34,9 +34,11 @@ const { Grid, Column } = createGrid({
 
 export {
 
+    Portal,
+
     Icon,
 
-    TouchableOpacity, ScrollView,
+    TouchableOpacity, ScrollView, Animated, PanResponder, LegacyModal,
 
     // Deprecate
     TextEditor,
@@ -60,7 +62,7 @@ export {
     Button, BubbleButton, ToggleButton,
 
     // Form
-    TextInput, PasswordInput, FileInput, TextField, HelperText, ToggleSwitch, RadioButton,
+    TextInput, PasswordInput, FileInput, DateTimeInput, TextField, HelperText, ToggleSwitch, RadioButton,
 
     // Material
     Chip, Card, List,

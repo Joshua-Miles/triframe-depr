@@ -48,6 +48,9 @@ const format = function(defaults){
     if(typeof defaults == 'string'){
         return `'${defaults}'`
     }
+    if(typeof defaults == 'object' && defaults.__proto__ == Object.prototype){
+        return `'${JSON.stringify(defaults)}'::json`
+    }
     if(defaults instanceof Date){
         return "NOW()"
     }
