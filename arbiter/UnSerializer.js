@@ -3,33 +3,31 @@ import { EventEmitter, Pipe } from '../herald';
 import { map, each, filter, index } from '../mason'
 import { snapshot } from "../mason";
 import { memoize } from '../herald/memoize';
-
-const print = variable => JSON.parse(JSON.stringify(variable))
+import { Collection } from '../librarian/Collection';
 
 let compare = (obj1, obj2) => {
     let patches = jsonpatch.compare(obj1, obj2)
     return patches.filter(patch => !patch.path.includes('__'))
 }
 
-
 let PENDING_VALUE = Symbol()
-let stringify = op => JSON.stringify(op)
 export class UnSerializer {
 
-    patches = {}
+    nodes = {}
 
-    states = {}
 
     constructor({ dependencies, types }) {
-        if (typeof window !== 'undefined') window.patches = this.patches
+        if (typeof window !== 'undefined') window.nodes = this.nodes
 
 
-        if (typeof window !== 'undefined') window.states = this.states
         this.agent = new EventEmitter
         this.dependencies = dependencies
 
-        this.types = map(types, (key, type) => this.unSerializeType(type, this.agent.of(key)))
-        this.types.Array = Array
+        this.types = { 
+            ...map(types, (key, type) => this.unSerializeType(type, this.agent.of(key))),
+            Collection
+        }
+            this.types.Array = Array
         if (typeof window !== 'undefined') Object.assign(window, this.types)
     }
 
@@ -109,52 +107,53 @@ export class UnSerializer {
 
             const ambassador = function* (emit, ...args) {
                 let patches = []
-                serializer.patches[name] = patches
-                let serializedResult = PENDING_VALUE
-                let result = PENDING_VALUE
+                let base = PENDING_VALUE;
+
+                serializer.nodes[name] = { 
+                    get patches(){
+                        return patches
+                    },
+                    get base(){
+                        return base
+                    },
+                    get emitDocument(){
+                        return emitDocument
+                    }
+                }
 
                 const handleResponse = function (response) {
                     if (response && response.error) {
                         return emit.throwError(new Error(response.message))
                     }
-                    if (serializedResult === PENDING_VALUE || !serializedResult) {
-                        serializedResult = response
+                    if (base === PENDING_VALUE || !base) {
+                        base = response
                         emitDocument()
                     } else if (response) {
-
                         let docChanged = reconcileOperations(response)
                         if (docChanged) {
                             emitDocument()
                         }
                     } else {
-                        serializedResult = response
+                        base = response
                         emitDocument()
                     }
                 }
 
                 const emitDocument = function () {
-                    let x = result
-                    if (typeof serializedResult == 'object') {
+                    let result = base;
+                    if (typeof base == 'object') {
                         try {
-                            // console.log('Patching: ', print(patches))
-                            result = snapshot(serializedResult)
-                            //if(name == 'Document.editorSession') console.log(scopeMarker, 'applied', print(patches))
-                            jsonpatch.applyPatch(result, patches)
-                            // console.log('Patched:', print(result))
-                            x = unSerializeDocument(result, onChange)
+                            let clone = snapshot(base)
+                            jsonpatch.applyPatch(clone, patches)
+                            result = unSerializeDocument(clone)
                         } catch (err) { console.warn(err) }
-                    } else{
-                        x = serializedResult
-                    }
-                    // console.log(x)
-                    emit(x)
+                    } 
+                    emit(result)
                 }
 
                 const onChange = function (diff) {
-                    //console.trace(diff)
                     patches.push(...diff)
                     patches = optimizePatches(patches)
-                    //if(name == 'Document.editorSession') console.log(scopeMarker, 'optmized', print(patches))
                     emitDocument()
                 }
 
@@ -168,15 +167,15 @@ export class UnSerializer {
                             if(op.op == 'remove' && patch.path.startsWith(op.path)){
                                 delete patches[index]
                             }
-                            if(JSON.stringify(op) == JSON.stringify(patch)){
+                            if(compare(op, patch).length == 0){
                                 delete patches[index]
                                 return;
                             }
                         }
                         changed = true
                     })
-                    jsonpatch.applyPatch(serializedResult, reconciliationPatch)
-                    serializer.patches[name] = patches = patches.filter(x => x)
+                    jsonpatch.applyPatch(base, reconciliationPatch)
+                    patches = patches.filter(x => x)
                     return changed
                 }
 
@@ -184,7 +183,7 @@ export class UnSerializer {
                 const optimizePatches = patches => {
                     //return patches
                     let bin = {}
-                    let temp = serializedResult
+                    let temp = base
                     patches.forEach(patch => {
                         if (bin[patch.path] && bin[patch.path].op == 'add' && patch.op == 'remove') {
                             delete bin[patch.path]
@@ -195,7 +194,6 @@ export class UnSerializer {
                             let patches = compare(previous, temp)
                             let changesBase = !!patches.length
                             if (changesBase) {
-                                // console.log('CHANGES:', patches)
                                 bin[patch.path] = patch
                             }
                         }
@@ -203,23 +201,16 @@ export class UnSerializer {
                     return Object.values(bin);
                 }
 
-
-                const read = (obj, path) => {
-                    if (path.length === 0) return obj
-                    let [next, ...rest] = path;
-                    return read(obj[next], rest)
-                }
-
-                const unSerializeDocument = (document, callback = () => void (0), path = '') => {
+                const unSerializeDocument = (document, path = '') => {
                     if (!document) return document
                     if (document.__type__) return serializer.types[document.__type__]
                     if (!document.__class__ && typeof document != 'object') return document
+                    if(Array.isArray(document)) return document.map( (doc, index) => unSerializeDocument(doc, `${path}/${index}`))
                     let response = serializer.types[document.__class__] ? new serializer.types[document.__class__] : new Object
-                    Object.assign(response, map(document, (propertyName, document) => unSerializeDocument(document, callback, `${path}/${propertyName}`)))
+                    Object.assign(response, map(document, (propertyName, document) => unSerializeDocument(document, `${path}/${propertyName}`)))
                     let resultSnapshot = snapshot(response)
                     Object.defineProperty(response, '_onChange', {
                         value: function () {
-                            // console.log('Diffing:', print(resultSnapshot), print(response))
                             let patches = compare(resultSnapshot, response)
                             jsonpatch.applyPatch(resultSnapshot, patches)
                             // These patches may not be necessary if the base already has the update from the server
@@ -227,7 +218,7 @@ export class UnSerializer {
                             // This creates a memory and cpu leak where the patch list grows without ever rebasing
                             this.patches.push(...patches)
                             let adjustedPatches = patches.map(patch => ({ ...patch, path: `${path}${patch.path}` }))
-                            callback(adjustedPatches)
+                            onChange(adjustedPatches)
                         }
                     })
                     Object.defineProperty(response, 'patches', { value: [] })

@@ -1,5 +1,4 @@
 import { jsonpatch } from './jsonpatch'
-import { Collection } from '../librarian/Collection';
 import { EventEmitter } from '../herald';
 import { map, filter } from '../mason';
 import { markersFor } from './Markers'
@@ -15,7 +14,7 @@ export class Serializer {
 
     constructor(types) {
         this.interface = {
-            types: map({ ...types, Collection }, (name, Type) => this.serializeType(Type, this.agent.of(name))),
+            types: map(types, (name, Type) => this.serializeType(Type, this.agent.of(name))),
             dependencies: this.dependencies
         }
     }
@@ -221,6 +220,7 @@ export class Serializer {
         if (!document) return document
 
         if (primativeTypes.includes(document.constructor.name)) return document
+        if(Array.isArray(document)) return document.map( (element, index) => this.serializeDocument(element, session, `${document.constructor.name}#${index}`))
         return {
             ...map(document, (propertyName, object) => this.serializeDocument(object, session, `${document.constructor.name}#${propertyName}`)),
             __class__: document.constructor.name,

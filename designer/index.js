@@ -4,7 +4,7 @@ import { Route, Switch, Redirect } from 'react-router'
 import { Router, Link } from './platform'
 
 // Native Paper Components
-import { Appbar, Avatar, Menu, Divider, Badge, RadioButton, Snackbar, Portal } from 'react-native-paper';
+import { Appbar, Avatar, Menu, Divider, Badge, RadioButton, Snackbar, Portal, ProgressBar, Checkbox } from 'react-native-paper';
 
 // 
 import { Provider, tether } from './Provider'
@@ -33,6 +33,10 @@ const { Grid, Column } = createGrid({
 
 
 export {
+
+    Checkbox,
+
+    ProgressBar,
 
     Portal,
 

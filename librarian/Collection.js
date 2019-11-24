@@ -1,6 +1,3 @@
-import { _shared } from "../arbiter/Markers";
-
-
 
 export class Collection {
 
@@ -23,12 +20,10 @@ export class Collection {
           };
     }
 
-    @_shared
     toArray(){
         return this.indexes.map( index => this[index])
     }
 
-    @_shared
     static fromArray(array){
         let collection = new this
         let homogeneous = true
@@ -45,7 +40,6 @@ export class Collection {
         return collection
     }
 
-    @_shared
     get first(){
         const { ordered } = this
         for(let i in ordered){
@@ -55,7 +49,6 @@ export class Collection {
     }
 
 
-    @_shared
     get last(){
         let result = null
         const { ordered } = this
@@ -65,7 +58,6 @@ export class Collection {
         return result
     }
 
-    @_shared
     get ordered(){
         let result = {}
         for(let key in this){
@@ -76,12 +68,10 @@ export class Collection {
         return result
     }
 
-    @_shared 
     get indexes(){
         return Object.keys(this).filter( key => ( !isNaN(key) || key.startsWith('new')) && !this[key]['__isDeleted__']  ).sort()
     }
 
-    @_shared
     get nextID(){
         let i = 1
         let id;
@@ -92,14 +82,12 @@ export class Collection {
         return id
     }
 
-    @_shared
     push(element){
         let { last } = this
         element.__index__ = last ? last.__index__ + 1 : 0
         return this[element.id] = element
     }
 
-    @_shared
     new(attributes = {}){
         let assign = Object.assign.bind(Object)
         assign(attributes, this.__presets__)
@@ -111,7 +99,6 @@ export class Collection {
     }
 
 
-    @_shared
     create(attributes = {}){
         let assign = Object.assign.bind(Object)
         assign(attributes, this.__presets__)
@@ -133,14 +120,12 @@ export class Collection {
     }
 
 
-    @_shared 
     remove(element){
         delete this[element.id]
         this._onChange()
         element.destroy()
     }
 
-    @_shared
     map(callback){
         let result = []
         this.forEach( (...args) => {
@@ -149,17 +134,14 @@ export class Collection {
         return result
     }
 
-    @_shared
     reduce(callback, initial){
         return this.toArray().reduce(callback, initial)
     }
 
-    @_shared
     sort(callback){
         return this.toArray().sort(callback)
     }
 
-    @_shared
     find(callback){
         let array = this.indexes.map( key => this[key])
         let newArray = array.find(callback)
@@ -167,21 +149,18 @@ export class Collection {
     }
 
 
-    @_shared
     some(callback){
         let array = this.indexes.map( key => this[key])
         let result = array.some(callback)
         return result
     }
 
-    @_shared
     filter(callback){
         let array = this.indexes.map( key => this[key])
         let newArray = array.filter(callback)
         return newArray
     }
 
-    @_shared
     mapCollection(callback){
         let array = this.indexes.map( key => this[key])
         let newArray = array.map(callback)
@@ -189,7 +168,6 @@ export class Collection {
     }
 
    
-    @_shared
     forEach(callback){
         let index = 0;
         const { ordered } = this
@@ -199,7 +177,6 @@ export class Collection {
         }
     }
 
-    @_shared
     each(callback){
         for(let i in this){
             if(i.startsWith('_')) continue
@@ -207,7 +184,6 @@ export class Collection {
         }
     }
 
-    @_shared
     indexedBy(index =  '_id', select = false, coalesceValue = undefined){
         let subject = this
         let returnValue = new Object;
@@ -224,7 +200,6 @@ export class Collection {
     }
 
 
-    @_shared
     get length(){
         return this.indexes.length
     }
