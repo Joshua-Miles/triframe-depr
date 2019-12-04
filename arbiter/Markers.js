@@ -157,6 +157,7 @@ const _composes = function (...parents) {
 
             let addElement = ( placement, name, descriptor ) => {
                 if(name == 'constructor' || typeof name == 'symbol') return
+                child.elements = child.elements.filter( element => !(element.key == name && element.placement == placement))
                 if(descriptor.value !== undefined && typeof descriptor.value !== 'function'){
                     if(descriptor.enumerable == false) return
                     let value = descriptor.value;

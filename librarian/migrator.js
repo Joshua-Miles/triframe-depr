@@ -1,7 +1,9 @@
 import { group, index, map, unique, filter } from '../mason'
 import { isNumeric } from './typing'
+import { Model } from '.'
 
 export const migrate = async (database, types) => {
+    types = filter(types, (key, value) => value.tableName != undefined )
     const patch = generatePatch(await formatSchema(await database.query(selectSchema())), types)
     if (patch) {
         console.log('Patching:', patch)

@@ -33,6 +33,8 @@ function loadModels(r) {
     return models
 }
 
+let id= 0
+
 export default class Server {
 
     constructor(...args) {
@@ -70,7 +72,7 @@ export default class Server {
     }
 
 
-    loadSession(oldToken, id) {
+    loadSession(oldToken) {
         let session;
         if (oldToken && fs.existsSync(`${SESSIONS_PATH}/${oldToken}.json`)) {
             try {
@@ -78,25 +80,19 @@ export default class Server {
                 fs.unlinkSync(`${SESSIONS_PATH}/${oldToken}.json`)
             } catch (err) {
                 console.log(err)
-                session = { id }
+                session = { id: id++ }
             }
         } else {
-            session = { id }
+            session = { id: id++ }
         }
 
         let token = this.createToken()
         this.saveSession(token, session)
-        session.destroy = function () {
-            Object.keys(session).forEach(key => {
-                if (key != 'destroy') delete session[key]
-            })
-        }
         return { session, token }
     }
 
     saveSession(token, session) {
         let sessionData = { ...session };
-        console.log(sessionData.currentUser)
         delete sessionData.destroy
         fs.writeFileSync(`${SESSIONS_PATH}/${token}.json`, JSON.stringify(this.serializer.serializeDocument(sessionData)))
     }

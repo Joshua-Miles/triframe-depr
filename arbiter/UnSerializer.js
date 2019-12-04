@@ -221,14 +221,15 @@ export class UnSerializer {
                             onChange(adjustedPatches)
                         }
                     })
-                    Object.defineProperty(response, 'patches', { value: [] })
+                    // TODO: This is wrong (not scoped correctly, only works if response is the top of the node)
+                    Object.defineProperty(response, 'patches', { value: patches })
                     return response
                 }
 
 
                 agent.emit('call', {
                     args,
-                    patches: Number.isFinite(this.id) ? this.patches || [] : [],
+                    patches: Number.isFinite(this.id) ? this.patches.filter( patch => patch) || [] : [],
                     id: this.id,
                     attributes: Number.isFinite(this.id) ? null : this,
                     respond: handleResponse
