@@ -25,7 +25,7 @@ module.exports = {
     rules: [
       {
         test: /\.m?js$/,
-        exclude: /(node_modules|bower_components)/,
+        exclude: path => (path.includes('node_modules') || path.includes('bower_components')) & !path.includes('triframe'),
         use: {
           loader: 'babel-loader',
           options: {

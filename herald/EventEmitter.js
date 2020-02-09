@@ -44,7 +44,7 @@ export class EventEmitter {
 
     nowAndOn(events, callback){
         let node = { events, calls: [], callback: (...args) => node.calls.push(args)}
-        let stream1 = this.on(events)
+        let stream1 = this.on(events) 
         stream1.observe( (...args) => {
             node.callback(...args)
         })

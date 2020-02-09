@@ -13,7 +13,7 @@ export default ({ children, open, render = () => null, onClose }) => {
         <DrawerLayout
             onDrawerClose={onClose}
             drawerWidth={300}
-            drawerLockMode={'unlocked'}
+            drawerLockMode={'locked-closed'}
             keyboardDismissMode="on-drag"
             ref={ x => drawer = x }
             renderNavigationView={() => render({ closeDrawer: onClose })}>

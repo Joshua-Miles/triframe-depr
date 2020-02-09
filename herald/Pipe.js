@@ -1,4 +1,5 @@
 const execute = Symbol()
+const pending = Symbol()
 
 export class Pipe {
 
@@ -9,6 +10,8 @@ export class Pipe {
     cancelationHandlers = []
 
     executions = []
+
+    currentValue = pending
 
     constructor(process, ...args) {
         let thisArg;
@@ -32,21 +35,24 @@ export class Pipe {
 
     unobserve(callback) {
         this.observers = this.observers.filter(observer => observer != callback)
+        if(this.observers.length == 0){
+            this.destroy()
+        }
     }
 
-    then(callback, errorHandler = () => void(0)) {
-        if (this.currentValue) this.currentValue instanceof Error
-                                    ? errorHandler(this.currentValue)
-                                    : callback(this.currentValue)
+    then(callback, errorHandler = () => void (0)) {
+        if (this.currentValue !== pending) return this.currentValue instanceof Error
+            ? errorHandler(this.currentValue)
+            : callback(this.currentValue)
         let catchHandler = (err) => {
-            this.errorHandlers = this.errorHandlers.filter( handler => handler != catchHandler)
+            this.errorHandlers = this.errorHandlers.filter(handler => handler != catchHandler)
             errorHandler(err)
         }
         this.catch(catchHandler)
         let resolve = () => resolve = true
         this.listeners.push(async (...args) => {
-            this.errorHandlers = this.errorHandlers.filter( handler => handler != catchHandler)
-            await callback(...args)
+            this.errorHandlers = this.errorHandlers.filter(handler => handler != catchHandler)
+            if(resolve !== true) await callback(...args)
             resolve()
         })
         return new Promise(ref => resolve === true ? ref() : resolve = ref)
@@ -60,9 +66,9 @@ export class Pipe {
         this.cancelationHandlers.push(callback)
     }
 
-    apply(callback, errorHandler = () => void(0)) {
-        if (this.currentValue) {
-            if(this.currentValue instanceof Error) errorHandler(this.currentValue)
+    apply(callback, errorHandler = () => void (0)) {
+        if (this.currentValue != pending) {
+            if (this.currentValue instanceof Error) errorHandler(this.currentValue)
             else callback(this.currentValue)
         } else {
             this.then(callback, errorHandler);
@@ -104,6 +110,7 @@ export class Pipe {
         }
 
         emit.throwError = this.throwError
+        emit.pipe = this
 
         try {
             cursor = this.process.call(this.thisArg, emit, ...this.args)
@@ -112,39 +119,39 @@ export class Pipe {
         }
 
 
-        
+
 
         const process = ({ value, done }) => {
-            return new Promise(async () => {
-                const { isPipe, isPromise } = this.constructor
-                const { cached, cache } = this
-                const cachedValue = cached(value)
+            const { isPipe, isPromise } = this.constructor
+            const { cached, cache } = this
+            const cachedValue = cached(value)
 
-                const throwError = err => {
-                    if(cursor.throw){
-                        return process(cursor.throw(err))
-                    } else {
-                        return this.throwError(err)
-                    }
+            const throwError = err => {
+                if (cursor.throw) {
+                    return process(cursor.throw(err))
+                } else {
+                    return this.throwError(err)
                 }
-            
+            }
 
-                let next;
-                if (done && value === undefined) return
-                if (done) next = (...args) => !aborted && emit(...args)
-                else next = (...args) => !aborted && moveCursor(...args)
 
-                if (cachedValue) cachedValue.currentValue instanceof Error 
-                                        ? throwError(cachedValue.currentValue)
-                                        : await next(cachedValue.currentValue);
+            let next;
+            if (done && value === undefined) return
+            if (done) next = (...args) => !aborted && emit(...args)
+            else next = (...args) => !aborted && moveCursor(...args)
+            return new Promise(async () => {
+                if (cachedValue) cachedValue.currentValue instanceof Error
+                    ? throwError(cachedValue.currentValue)
+                    : await next(cachedValue.currentValue);
                 else if (isPipe(value)) {
+                    this.dependencies.push(value)
                     value.apply(result => {
                         cache(value);
                         next(result);
                     }, err => {
                         cache(value)
                         throwError(err)
-                    } );
+                    });
                 }
                 else if (isPromise(value)) {
                     await value
@@ -175,7 +182,6 @@ export class Pipe {
         pipe.catch(observer)
         pipe.observe(observer)
         this.onCancel(() => pipe.unobserve(observer))
-        this.dependencies.push(pipe)
     }
 
     destroy() {
@@ -186,12 +192,14 @@ export class Pipe {
     cached = pipe => {
         let cachedPipe = this.dependencies.find(dependency => dependency.isEqual(pipe))
         if (cachedPipe) {
-            if (cachedPipe !== pipe) pipe.destroy()
+            if (cachedPipe !== pipe) {
+                pipe.destroy()
+            }
             return cachedPipe
         }
     }
 
-    isEqual = pipe => pipe && pipe.process == this.process && JSON.stringify(pipe.args) === JSON.stringify(this.args)
+    isEqual = pipe => pipe && pipe.process == this.process && JSON.stringify(pipe.args) === JSON.stringify(this.args) && (pipe.thisArg == this.thisArg || !pipe.thisArg || !this.thisArg || this.thisArg.id == pipe.thisArg.id)
 
     static isPipe = value => value && typeof value.observe == 'function'
 

@@ -4,6 +4,8 @@ import { map, each, filter, index } from '../mason'
 import { snapshot } from "../mason";
 import { memoize } from '../herald/memoize';
 import { Collection } from '../librarian/Collection';
+import { List } from '../librarian/List';
+
 
 let compare = (obj1, obj2) => {
     let patches = jsonpatch.compare(obj1, obj2)
@@ -23,11 +25,12 @@ export class UnSerializer {
         this.agent = new EventEmitter
         this.dependencies = dependencies
 
-        this.types = { 
+        this.types = {
             ...map(types, (key, type) => this.unSerializeType(type, this.agent.of(key))),
-            Collection
+            Collection,
+            List
         }
-            this.types.Array = Array
+        this.types.Array = Array
         if (typeof window !== 'undefined') Object.assign(window, this.types)
     }
 
@@ -90,18 +93,18 @@ export class UnSerializer {
             return new Function(...dependencyNames, `return (${code})`)(...dependencies)
         } else {
 
-            let bin = {}
+            let bin = []
             const method = function (...args) {
-                let openPipe = () => new Pipe([this, ambassador], ...args)
-                if (cache) {
-                    let hash = JSON.stringify({ args, attributes: this })
-                    if (!bin[hash]) {
-                        bin[hash] = openPipe()
-                    }
-                    return bin[hash]
-                } else {
-                    return openPipe()
-                }
+                let newPipe = new Pipe([this, ambassador], ...args)
+                // if (cache) {
+                //     let cached = bin.find( pipe => pipe.isEqual(newPipe))
+                //     if (cached) {
+                //         newPipe.destroy()
+                //         return cached
+                //     }
+                //     bin.push( newPipe )
+                // }
+                return newPipe
             }
 
 
@@ -109,14 +112,14 @@ export class UnSerializer {
                 let patches = []
                 let base = PENDING_VALUE;
 
-                serializer.nodes[name] = { 
-                    get patches(){
+                serializer.nodes[name] = {
+                    get patches() {
                         return patches
                     },
-                    get base(){
+                    get base() {
                         return base
                     },
-                    get emitDocument(){
+                    get emitDocument() {
                         return emitDocument
                     }
                 }
@@ -140,15 +143,18 @@ export class UnSerializer {
                 }
 
                 const emitDocument = function () {
-                    let result = base;
-                    if (typeof base == 'object') {
-                        try {
-                            let clone = snapshot(base)
-                            jsonpatch.applyPatch(clone, patches)
-                            result = unSerializeDocument(clone)
-                        } catch (err) { console.warn(err) }
-                    } 
-                    emit(result)
+                    
+                    setTimeout(() => {
+                        let result = base;
+                        if (typeof base == 'object') {
+                            try {
+                                let clone = snapshot(base)
+                                jsonpatch.applyPatch(clone, patches)
+                                result = unSerializeDocument(clone)
+                            } catch (err) { console.warn(err) }
+                        }
+                        emit(result)
+                    }, 10 / 1000)
                 }
 
                 const onChange = function (diff) {
@@ -162,12 +168,12 @@ export class UnSerializer {
                     let reconciliationPatch = []
                     ops.forEach((op) => {
                         reconciliationPatch.push(op)
-                        for(let index in patches){
+                        for (let index in patches) {
                             let patch = patches[index];
-                            if(op.op == 'remove' && patch.path.startsWith(op.path)){
+                            if (op.op == 'remove' && patch.path.startsWith(op.path)) {
                                 delete patches[index]
                             }
-                            if(compare(op, patch).length == 0){
+                            if (compare(op, patch).length == 0) {
                                 delete patches[index]
                                 return;
                             }
@@ -205,7 +211,7 @@ export class UnSerializer {
                     if (!document) return document
                     if (document.__type__) return serializer.types[document.__type__]
                     if (!document.__class__ && typeof document != 'object') return document
-                    if(Array.isArray(document)) return document.map( (doc, index) => unSerializeDocument(doc, `${path}/${index}`))
+                    if (Array.isArray(document)) return document.map((doc, index) => unSerializeDocument(doc, `${path}/${index}`))
                     let response = serializer.types[document.__class__] ? new serializer.types[document.__class__] : new Object
                     Object.assign(response, map(document, (propertyName, document) => unSerializeDocument(document, `${path}/${propertyName}`)))
                     let resultSnapshot = snapshot(response)
@@ -226,14 +232,16 @@ export class UnSerializer {
                     return response
                 }
 
+                const getPatches = () => this.patches ? this.patches.filter(patch => patch) : [];
 
                 agent.emit('call', {
                     args,
-                    patches: Number.isFinite(this.id) ? this.patches.filter( patch => patch) || [] : [],
+                    patches: Number.isFinite(this.id) ? getPatches() : [],
                     id: this.id,
                     attributes: Number.isFinite(this.id) ? null : this,
                     respond: handleResponse
                 })
+
                 try {
                     this.patches = []
                 } catch (err) { }
@@ -241,6 +249,4 @@ export class UnSerializer {
             return method
         }
     }
-
-
 }

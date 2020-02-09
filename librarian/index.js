@@ -1,3 +1,5 @@
 import { Model } from './Model'
 import { Collection } from './Collection.js'
-export { Model, Collection }
+import { List } from './List.js'
+
+export { Model, Collection, List }

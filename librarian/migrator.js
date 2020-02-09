@@ -1,6 +1,6 @@
 import { group, index, map, unique, filter } from '../mason'
 import { isNumeric } from './typing'
-import { Model } from '.'
+import { Model, List } from '.'
 
 export const migrate = async (database, types) => {
     types = filter(types, (key, value) => value.tableName != undefined )
@@ -50,7 +50,8 @@ const format = function(defaults){
     if(typeof defaults == 'string'){
         return `'${defaults}'`
     }
-    if(typeof defaults == 'object' && defaults.__proto__ == Object.prototype){
+    if(typeof defaults == 'object' && (defaults.__proto__ == Object.prototype || defaults instanceof List)){
+        console.log(`'${JSON.stringify(defaults)}'::json`)
         return `'${JSON.stringify(defaults)}'::json`
     }
     if(defaults instanceof Date){

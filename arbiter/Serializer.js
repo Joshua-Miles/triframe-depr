@@ -1,8 +1,9 @@
-import { jsonpatch } from './jsonpatch'
+import { jsonpatch, JSONPatchOT } from './jsonpatch'
 import { EventEmitter } from '../herald';
 import { map, filter } from '../mason';
 import { markersFor } from './Markers'
 import { SessionRequest } from './SessionRequest';
+import { List } from '../librarian';
 const skippedPrototypes = [Object.prototype, Function.prototype, EventEmitter.prototype]
 const skippedProperties = ['prototype', 'constructor']
 const primativeTypes = ['String', 'Boolean', 'Number', 'Date', 'Function']
@@ -11,6 +12,7 @@ export class Serializer {
 
     agent = new EventEmitter
     dependencies = new Array
+    patches = new Object
 
     constructor(types) {
         this.interface = {
@@ -61,7 +63,7 @@ export class Serializer {
             return {
                 name,
                 type: 'method',
-                value: this.serializeFunction(descriptor.value, markers, agent),
+                value: this.serializeFunction(name, descriptor.value, markers, agent),
                 markers: booleanMarkers
             }
         }
@@ -71,8 +73,8 @@ export class Serializer {
                 name,
                 type: 'property',
                 value: {
-                    get: descriptor.get && this.serializeFunction(descriptor.get, markers, agent),
-                    set: descriptor.set && this.serializeFunction(descriptor.set, markers, agent)
+                    get: descriptor.get && this.serializeFunction(name, descriptor.get, markers, agent),
+                    set: descriptor.set && this.serializeFunction(name, descriptor.set, markers, agent)
                 },
                 markers: booleanMarkers
             }
@@ -88,13 +90,15 @@ export class Serializer {
         }
     }
 
-    serializeFunction(func, markers, agent) {
+    serializeFunction(name, func, markers, agent) {
         const callCache = {}
         let { shared, session, authorize, publish, stream } = markers;
+        
         if (session && shared) throw Error('A function cannot be shared and access the session')
         if (authorize && shared) throw Error('A function cannot be shared and require authorization')
         if (authorize && publish) throw Error('A function cannot be publish and require authorization')
         const cache = (!session && stream);
+
         if (shared) {
             let dependencies = shared
             let dependencyNames = Object.keys(dependencies)
@@ -107,21 +111,48 @@ export class Serializer {
         } else {
             const Type = this.CurrentType;
             const currentPlacement = this.currentPlacement;
-            agent.on('call', async ({ socket, args, id, patches, includes, attributes, session, emit }) => {
-
+            agent.on('call', async ({ socket, requestId, instanceId, args, id, patches, includes, timestamp, attributes, session, emit }) => {
                 // Create a unique identifier for this method call
                 let hash = JSON.stringify({ args, id })
 
                 // Create the object of the request
                 let createTarget = async() => {
-                    let target = currentPlacement == 'class' ? Type : (Number.isInteger(id) ? await Type.find(id, includes) : new Type)
-                    try { jsonpatch.applyPatch(target, patches) } catch (err) { }
+                    let namespace = `${Type.name}.${id}`
+                    let target
+                    if(currentPlacement == 'class') target = Type 
+                    else if(Number.isInteger(id)) target = this.instanceCache[instanceId] || await Type.find(id, includes) 
+                    else target = new Type
+                    try { 
+                        if(this.patches[namespace]){
+                            // let otherPatches = this.patches[namespace].reduce( (patches, request) => {
+                            //     if(request.timestamp > timestamp && request.socketId != socket.id){
+                            //         patches.push(...request.patches)
+                            //     }
+                            //     return patches
+                            // }, [])
+                            // patches = JSONPatchOT.transform(patches, otherPatches);
+                        }
+                        patches.forEach( op => {
+                            op.sender = socket.id
+                            try{
+                                jsonpatch.applyOperation(target, op) 
+                            } catch(err){
+                                console.log(err)
+                            }
+                        })
+                        if(id) {
+                            this.patches[namespace] = this.patches[namespace] || []
+                            this.patches[namespace].push({ patches, timestamp, socketId: socket.id })
+                        }
+                    } catch (err) { console.log('ERROR:', err) }
                     if (attributes) Object.assign(target, attributes)
+                    target.patches = patches
                     return target
                 }
 
                 // Process a document and opened pipe for response
                 let sendResponse = ({document, pipe}) => {
+
                     // Cache result if it has not been cached yet
                     if(cache && !callCache[hash]) callCache[hash] = {
                         get document() {
@@ -131,19 +162,26 @@ export class Serializer {
                             return pipe
                         }
                     }
-                    let serialized = this.serializeDocument(document, session)
-                    emit(serialized)
+                 
+
+                    let serialized = this.serializeDocument(document, session, `${socket.id}.${requestId}`)
+                    emit({ body: serialized, timestamp: (new Date).getTime() })
                     
                     // Emit updates to the requestor
                     if (pipe && pipe.observe) {
                         let emitUpdate = newDocument => {
+                            if(newDocument && newDocument.$patch){
+                                jsonpatch.applyPatch(serialized, newDocument.$patch)
+                                return emit({ body: newDocument.$patch.filter(op => op.sender !== socket.id)})
+                            }
+                            if(name == 'Document.content') console.log("AND HERE----")
                             document = newDocument
-                            let newSerialized = this.serializeDocument(newDocument, session)
+                            let newSerialized = this.serializeDocument(newDocument, session, `${socket.id}.${requestId}`)
                             if(newSerialized && serialized){
                                 let patch = jsonpatch.compare(serialized, newSerialized)
-                                emit(patch)
+                                emit({ body: patch, timestamp: (new Date).getTime() })
                             } else {
-                                emit(newSerialized)
+                                emit({ body: newSerialized, timestamp: (new Date).getTime()})
                             }
                             serialized = newSerialized
                         }
@@ -195,7 +233,9 @@ export class Serializer {
         }
     }
 
-    serializeDocument(document, session, propertyName = false) {
+    instanceCache = {}
+
+    serializeDocument(document, session, instanceId, propertyName = false) {
         if (propertyName && session) {
             let { authorize, publish } = markersFor(propertyName)
             if (authorize && publish) throw Error('A field cannot be publish and require authorization')
@@ -205,27 +245,31 @@ export class Serializer {
                 else authorizer = authorize.unless, message = authorize.message
                 if (!authorizer(session)) return undefined
             }
-            if (!authorize && !publish && !propertyName.startsWith('Collection') && !propertyName.includes('_') && !propertyName.startsWith('Object') && !propertyName.startsWith('Array')) {
+            if (!authorize && !publish && !propertyName.startsWith('Collection') && !propertyName.startsWith('List') && !propertyName.includes('_') && !propertyName.startsWith('Object') && !propertyName.startsWith('Array')) {
                 //console.log('blocked', propertyName)
                 return undefined
             } else {
                 //console.log(propertyName)
             }
             // if(propertyName.startsWith('Collection')) console.log(propertyName, document)
-
         }
         if (typeof document === 'function') return {
             __type__: document.name
         }
         if (!document) return document
-
+        this.cacheInstance(document, `${instanceId}/${propertyName}`)
         if (primativeTypes.includes(document.constructor.name)) return document
-        if(Array.isArray(document)) return document.map( (element, index) => this.serializeDocument(element, session, `${document.constructor.name}#${index}`))
+        if(Array.isArray(document)) return document.map( (element, index) => this.serializeDocument(element, session, instanceId, `${document.constructor.name}#${index}`))
         return {
-            ...map(document, (propertyName, object) => this.serializeDocument(object, session, `${document.constructor.name}#${propertyName}`)),
+            ...map(document, (propertyName, object) => this.serializeDocument(object, session, instanceId, `${document.constructor.name}#${propertyName}`)),
             __class__: document.constructor.name,
-            __index__: document.__index__
+            __index__: document.__index__,
+            __IID__: `${instanceId}/${propertyName}`
         }
+    }
+
+    cacheInstance(instance, socketId){
+        this.instanceCache[socketId] = instance
     }
 
     storeDependency(data) {

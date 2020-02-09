@@ -33,11 +33,12 @@ export class Model extends DBConnection {
 
     @_stream
     static * find(id, includes = []) {
+        console.log('HERE', id)
         yield this.nowAndOn(`updated.${id}`)
         if (includes.length) yield this.global.nowAndOn(
             includes.map(include => `${this.classFor(include).name}.*`)
         )
-        let results = yield this.query(({ sql, self }) => (sql`
+        let results = yield this.query(({ sql, self, each }) => (sql`
             SELECT 
                 ${self(
             '*',
@@ -47,9 +48,9 @@ export class Model extends DBConnection {
         )} 
             FROM 
                 ${self}
-                ${includes.map(include => (
-            self[include].join()
-        ))}
+                ${each(includes, (_, include) => (
+                    sql`${self[include].join()}`
+                ))}
             WHERE ${self.id}=${id}
         `))
         return results.first
@@ -62,7 +63,7 @@ export class Model extends DBConnection {
         if (includes.length) yield this.global.nowAndOn(
             includes.map(include => `${this.classFor(include).name}.*`)
         )
-        return this.query(({ sql, self, each }) => sql`
+        return this.query(({ sql, self, each, eachAttribute, escape }) => sql`
             SELECT 
                 ${self(
             '*',
@@ -72,20 +73,20 @@ export class Model extends DBConnection {
         )} 
             FROM 
                 ${self}
-                ${includes.map(include => (
-            self[include].join()
-        ))}
+                ${each(includes, (_, include) => (
+                    sql`${self[include].join()}`
+                ))}
             WHERE 
                 ${Object.keys(attributes).length > 0 ?
-                each(attributes, (key, value) => {
-                    if (Array.isArray(value) && value.length > 0)
-                        return `${self[key]} IN (${value.join(', ')})`
+                eachAttribute(attributes, (key, value) => {
+                    if (Array.isArray(attributes[key]) && attributes[key].length > 0)
+                        return `${self[key]} IN (${attributes[key].map(escape).join(', ')})`
                     else if (value === null)
                         return `${self[key]} IS NULL`
-                    else if (!Array.isArray(value))
-                        return `${self[key]}=${value}`
+                    else if (!Array.isArray(attributes[key]))
+                        return `${self[key]}=${escape(value)}`
                     else
-                        return `false`
+                        return sql`false`
                 }, 'AND'
                 ) : 1}
         `)
@@ -100,7 +101,7 @@ export class Model extends DBConnection {
     @_stream
     static *search(attributes, includes = []) {
         yield this.nowAndOn('*')
-        return this.query(({ sql, self, each }) => sql`
+        return this.query(({ sql, self, each, eachAttribute, escape }) => sql`
             SELECT 
                 ${self(
             '*',
@@ -110,13 +111,14 @@ export class Model extends DBConnection {
         )} 
             FROM 
                 ${self}
-                ${includes.map(include => (
-            self[include].join()
+                ${each(includes, (_, include) => (
+                    sql`${self[include].join()}`
+                ))}
         ))}
             WHERE 
-                ${each(attributes, (key, value) =>
-            `${key} LIKE ${value}`, 'OR'
-        )}
+                ${eachAttribute(attributes, (key, value) =>
+                    `${key} LIKE ${escape(value)}`, 'OR'
+                )}
         `)
     }
 
@@ -148,7 +150,15 @@ export class Model extends DBConnection {
     @_shared
     set(attributes) {
         Object.assign(this, attributes)
-        this._onChange()
+        const patches = []
+        for (let attribute in attributes) {
+            patches.push({
+                op: 'replace',
+                path: `/${attribute}`,
+                value: attributes[attribute]
+            })
+        }
+        this._onChange(patches)
     }
 
 
@@ -168,15 +178,15 @@ export class Model extends DBConnection {
         const { attributes } = this;
         if (attributes.id) {
             delete attributes.id
-            await this.query(({ sql, self, each }) => {
+            await this.query(({ sql, self, escape, eachAttribute }) => {
                 return sql`
                     UPDATE ${self} 
-                    SET ${each(attributes, (key, value) => (
-                        `"${key}"=${value}`
+                    SET ${eachAttribute(attributes, (key, value) => (
+                        `"${key}"=${escape(value)}`
                     ))}
                     WHERE id=${this.id}
                     `
-        })
+            })
             await this.emit(`updated.${this.id}`, this)
         } else {
             delete attributes.id
@@ -257,7 +267,7 @@ export class Model extends DBConnection {
         let instance = new this
         let field = instance.fields[fieldName] || instance.fields[toForeignKeyName(fieldName)]
         let relation
-        if(!field) console.log(fieldName)
+        if (!field) console.log(fieldName)
         switch (field.alias) {
             case 'hasMany':
                 relation = field.metadata.of || fieldName
@@ -313,15 +323,15 @@ export class Model extends DBConnection {
 
 }
 
-Object.defineProperty(Model, 'global', {
+    Object.defineProperty(Model, 'global', {
     enumerable: false,
     writable: true,
     value: agent
 })
 
-Object.defineProperty(Model, 'events', {
+    Object.defineProperty(Model, 'events', {
     enumerable: false,
     get: function () {
-        return agent.of(this.name)
-    }
+    return agent.of(this.name)
+}
 })

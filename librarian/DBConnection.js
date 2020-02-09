@@ -15,7 +15,7 @@ export class DBConnection {
     }
 
     static async migrate(types){
-        this.types = types;
+        this.types = { ...types, Object };
         await migrate(this.client, types)
     }
     

@@ -18,9 +18,9 @@ export const Provider = (props) => (
 
 let displayError;
 
-const Main = ({ children, iconSets = ['MaterialIcons'], url = '' }) => {
+const Main = ({ children, iconSets = ['MaterialIcons'], url = '', OverideUnSerializer = UnSerializer }) => {
     let error;
-    ([ error, displayError ] = useState(false))
+    ([error, displayError] = useState(false))
     let [models, saveModels] = useState({ areReady: false })
     useEffect(() => {
         let counter = 0;
@@ -32,7 +32,7 @@ const Main = ({ children, iconSets = ['MaterialIcons'], url = '' }) => {
             localStorage.setItem('token', token)
         })
         io.on('interface', inter => {
-            let { types, agent } = new UnSerializer(inter)
+            let { types, agent } = new OverideUnSerializer(inter)
             agent.on('*', (payload, action) => {
                 let id = counter++
                 io.on(id, result => {
@@ -40,7 +40,7 @@ const Main = ({ children, iconSets = ['MaterialIcons'], url = '' }) => {
                 })
                 io.emit('message', { payload, action, id })
             })
-            saveModels({ ...types, url})
+            saveModels({ ...types, url })
         })
         io.on('disconnect', () => {
             window.location.reload()
@@ -52,11 +52,11 @@ const Main = ({ children, iconSets = ['MaterialIcons'], url = '' }) => {
                 {Platform.OS === 'web' ? (
                     <style type="text/css">{`
                         ${iconSets.map(iconSet => (
-                            `@font-face {
+                        `@font-face {
                                 font-family: ${iconSet};
                                 src: url(${require(`react-native-vector-icons/Fonts/${iconSet}.ttf`)}) format('truetype');
                             }`
-                        )).join("\n")}
+                    )).join("\n")}
                         `}
                     </style>
                 ) : null}
@@ -73,7 +73,7 @@ const Main = ({ children, iconSets = ['MaterialIcons'], url = '' }) => {
                         }}
                     >
                         {error.message}
-                    </Snackbar>    
+                    </Snackbar>
                     {children}
                 </View>
             </PaperProvider>
@@ -174,53 +174,52 @@ let ConnectedComponent = withRouter(({ props = [], models, Component, history, m
 
     const [data, dispatch] = useState({ jsx })
     const propsArray = Object.values(props)
+    const getHistory = () => ({ history, match, location })
 
     useEffect(() => {
-        function restart(){
-            let pipe;
-            if (models.areReady === false) return
+        let pipe;
+        if (models.areReady === false) return
 
-            let whileLoading = (jsx) => dispatch({ jsx })
+        let whileLoading = (jsx) => dispatch({ jsx })
 
-            let [use, restartUse] = createUse()
-            let useContext = createUseContext(models)
-            let useRouter = () => new Pipe(() => ({ history, match, location }))
-            let redirect = path => history.push(path)
+        let [use, restartUse] = createUse()
+        let useContext = createUseContext(models)
+        let useRouter = () => new Pipe(getHistory)
+        let redirect = path => history.push(path)
 
-            let defaultErrorHandler = (err) => {
-                displayError(err)
-            }
-
-            let handleError = defaultErrorHandler
-
-            let onError = callback => handleError = err => callback(err, defaultErrorHandler)
-
-            let catchErrors = callback => (...args) => {
-                try {
-                    let result = callback(...args)
-                    if(result instanceof Promise) result.catch(handleError)
-                } catch(err){
-                    handleError(err)
-                }
-            }
-
-            let runAfterRender
-            let afterRender = callback => runAfterRender = callback
-
-            let payload = { models, props, redirect, use, useContext, useRouter, whileLoading, onError, catchErrors, afterRender }
-            pipe = new Pipe(() => Component(payload), payload)
-            pipe.observe(jsx => {
-                restartUse()
-                dispatch({ jsx, runAfterRender })
-            })
-            // TODO: A thing here?
-            pipe.catch(err => console.log('well', err))
-            return () => pipe && pipe.destroy()
+        let defaultErrorHandler = (err) => {
+            displayError(err)
         }
-        return restart()
+
+        let handleError = defaultErrorHandler
+
+        let onError = callback => handleError = err => callback(err, defaultErrorHandler)
+
+        let catchErrors = callback => (...args) => {
+            try {
+                let result = callback(...args)
+                if (result instanceof Promise) result.catch(handleError)
+            } catch (err) {
+                handleError(err)
+            }
+        }
+
+        let runAfterRender
+        let afterRender = callback => runAfterRender = callback
+
+        let payload = { models, props, redirect, use, useContext, useRouter, whileLoading, onError, catchErrors, afterRender }
+        pipe = new Pipe(() => Component(payload), payload)
+        pipe.observe(jsx => {
+            restartUse()
+            dispatch({ jsx, runAfterRender })
+        })
+        // TODO: A thing here?
+        pipe.catch(err => console.log('well', err))
+        return () => pipe && pipe.destroy()
+
     }, [models.areReady, ...propsArray])
-    useEffect( () => {
-        if(typeof data.runAfterRender == 'function') data.runAfterRender()
+    useEffect(() => {
+        if (typeof data.runAfterRender == 'function') data.runAfterRender()
     })
     return data.jsx
 })

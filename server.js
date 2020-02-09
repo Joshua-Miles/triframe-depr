@@ -56,7 +56,7 @@ export default class Server {
             socket.emit('interface', serializer.interface)
             socket.on('message', ({ action, payload, id }) => {
                 serializer.agent.emit(action, {
-                    ...payload, socket, session,  emit: (result) => {
+                    ...payload, socket, session, requestId: id, emit: (result) => {
                         socket.emit(id, result)
                     }
                 })
