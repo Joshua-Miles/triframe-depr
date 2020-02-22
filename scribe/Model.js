@@ -117,7 +117,7 @@ class Model {
     }
 
 
-    async static truncate(){
+    static async truncate(){
         const { relation } = this;
         return sql`
             DELETE FROM ${relation} WHERE 1
