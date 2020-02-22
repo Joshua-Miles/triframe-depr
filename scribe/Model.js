@@ -1,7 +1,6 @@
 import { sql, literal, keys, values, pairs, } from "./sql";
-import { metadata, filter, index, each, getMetadata, EventEmitter } from "../core";
+import { metadata, filter, index, each, getMetadata, EventEmitter, toTableName } from "../core";
 import { pk, stream } from "./decorators";
-
 
 class Model {
 
@@ -118,7 +117,17 @@ class Model {
     }
 
 
+    async static truncate(){
+        const { relation } = this;
+        return sql`
+            DELETE FROM ${relation} WHERE 1
+        `
+    }
+
+
     // ============================ UTILS ============================
+
+
 
 
     static get defaultSelectedColumns(){
@@ -126,7 +135,7 @@ class Model {
     }
 
     static get relation(){
-        return literal(this.name.toLowerCase())
+        return literal(toTableName(this.name))
     }
 
     static get persistedFields(){

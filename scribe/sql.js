@@ -131,7 +131,7 @@ function generateSQL(obj, remaining = '') {
 function buildSelectClause(className, properties, { label = false, alias = false, nested = false } = {}) {
     const columns = []
     const metadata = applicationMetadata[className]
-    const relationName = alias || className.toLowerCase()
+    const relationName = alias || toTableName(className)
     columns.push(
         label ? `'id', "${relationName}".id` : `"${relationName}".id`,
         label ? `'__class__', '${className}'` : `'${className}' as __class__`
@@ -231,27 +231,27 @@ function buildJoinClause(className, properties, { label = false, alias = false, 
                 }
             }
             ; ({ options, joinType } = metadata[key])
-            const relationName = alias || currentClassName.toLowerCase()
+            const relationName = alias || toTableName(currentClassName)
             const nextRelationName = toClassName(options.a || options.an || options.of || key)
-            const myAliasName = options.as || currentClassName.toLowerCase()
+            const myAliasName = options.as || toTableName(currentClassName)
             switch (joinType) {
                 case 'belongsTo':
                     value[toForeignKeyName(key)] = true
                     joins.push(
                         !(value[nestedQueryMarker])
-                            ? `LEFT JOIN ${nextRelationName.toLowerCase()} as ${name} ON ${relationName}.${toForeignKeyName(key)} = ${name.toLowerCase()}.id`
+                            ? `LEFT JOIN ${toTableName(nextRelationName)} as ${name} ON ${relationName}.${toForeignKeyName(key)} = ${toTableName(name)}.id`
                             : `LEFT JOIN (
-                                        SELECT ${generateSQL({ [nextRelationName.toLowerCase()]: value })}
-                                    ) as ${name} ON ${relationName}.${toForeignKeyName(key)} = ${name.toLowerCase()}.id`
+                                        SELECT ${generateSQL({ [toTableName(nextRelationName)]: value })}
+                                    ) as ${name} ON ${relationName}.${toForeignKeyName(key)} = ${toTableName(name)}.id`
                     )
                     break;
                 case 'hasOne':
                     value[toForeignKeyName(myAliasName)] = true
                     joins.push(
                         !(value[nestedQueryMarker])
-                            ? `LEFT JOIN ${nextRelationName.toLowerCase()} as ${name} ON ${name}.${toForeignKeyName(myAliasName)} = ${relationName}.id`
+                            ? `LEFT JOIN ${toTableName(nextRelationName)} as ${name} ON ${name}.${toForeignKeyName(myAliasName)} = ${relationName}.id`
                             : `LEFT JOIN (
-                                    SELECT ${generateSQL({ [nextRelationName.toLowerCase()]: value })}
+                                    SELECT ${generateSQL({ [toTableName(nextRelationName)]: value })}
                                 ) as ${name} ON ${name}.${toForeignKeyName(myAliasName)} = ${relationName}.id`
                     )
                     break;
@@ -259,9 +259,9 @@ function buildJoinClause(className, properties, { label = false, alias = false, 
                     value[toForeignKeyName(myAliasName)] = true
                     joins.push(
                         !(value[nestedQueryMarker])
-                            ? `LEFT JOIN ${nextRelationName.toLowerCase()} as ${name} ON ${name}.${toForeignKeyName(myAliasName)} = ${relationName}.id`
+                            ? `LEFT JOIN ${toTableName(nextRelationName)} as ${name} ON ${name}.${toForeignKeyName(myAliasName)} = ${relationName}.id`
                             : `LEFT JOIN (
-                                    SELECT ${generateSQL({ [nextRelationName.toLowerCase()]: value })}
+                                    SELECT ${generateSQL({ [toTableName(nextRelationName)]: value })}
                                 ) as ${name} ON ${name}.${toForeignKeyName(myAliasName)} = ${relationName}.id`
                     )
                     break;
@@ -273,7 +273,7 @@ function buildJoinClause(className, properties, { label = false, alias = false, 
 
 
 function buildModel(className, properties, { nested, alias } = {}) {
-    const relationName = alias || className.toLowerCase()
+    const relationName = alias || toTableName(className)
 
     const model = { toString: () => relationName }
     const metadata = applicationMetadata[className]
