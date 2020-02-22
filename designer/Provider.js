@@ -1,12 +1,12 @@
 import socketIo from 'socket.io-client';
-import { UnSerializer } from 'triframe/arbiter/UnSerializer';
 import React, { useState, useEffect } from 'react';
 import { withRouter } from 'react-router'
-import { Pipe, EventEmitter } from '../herald';
-import { Platform, Router, Title } from './index'
+import { Pipe, EventEmitter } from '../core';
+import { Router } from './Router'
 import { Provider as PaperProvider, Snackbar, Portal } from 'react-native-paper'
-import { crawl } from '../mason';
 import { View } from 'react-native'
+import { createUnserializer } from '../arbiter'
+
 
 export const Model = React.createContext({ areReady: false })
 
@@ -16,50 +16,29 @@ export const Provider = (props) => (
     </Router>
 )
 
+
 let displayError;
 
-const Main = ({ children, iconSets = ['MaterialIcons'], url = '', OverideUnSerializer = UnSerializer }) => {
+const Main = ({ children, iconSets = ['MaterialIcons'], url = 'http://localhost:8080' }) => {
     let error;
     ([error, displayError] = useState(false))
     let [models, saveModels] = useState({ areReady: false })
     useEffect(() => {
-        let counter = 0;
-        let token = localStorage.getItem('token')
-        let io = socketIo(url, token ? {
-            query: { token }
-        } : undefined)
-        io.on('token', token => {
-            localStorage.setItem('token', token)
-        })
-        io.on('interface', inter => {
-            let { types, agent } = new OverideUnSerializer(inter)
-            agent.on('*', (payload, action) => {
-                let id = counter++
-                io.on(id, result => {
-                    payload.respond(result)
-                })
-                io.emit('message', { payload, action, id })
+        (async function () {
+            await fetch(`${url}/init`, { credentials: 'include' }) // <-- necessary to initialize session. This should be removed in a future release
+            let io = socketIo(url)
+            if(typeof window !== 'undefined') window.io = io
+            const unserialize = createUnserializer(io)
+            io.on('interface', schema => {
+                const api = unserialize(schema)
+                saveModels({ ...api, url })
+                if (typeof window !== 'undefined') Object.assign(window, api)
             })
-            saveModels({ ...types, url })
-        })
-        io.on('disconnect', () => {
-            window.location.reload()
-        })
+        })()
     }, [])
     return (
         <Model.Provider value={models}>
             <PaperProvider>
-                {Platform.OS === 'web' ? (
-                    <style type="text/css">{`
-                        ${iconSets.map(iconSet => (
-                        `@font-face {
-                                font-family: ${iconSet};
-                                src: url(${require(`react-native-vector-icons/Fonts/${iconSet}.ttf`)}) format('truetype');
-                            }`
-                    )).join("\n")}
-                        `}
-                    </style>
-                ) : null}
                 <Portal.Host />
                 <View style={{ height: '100vh' }}>
                     <Snackbar
@@ -91,26 +70,15 @@ let createUse = () => {
     const agent = new EventEmitter;
     const createMonitor = index => {
         let monitor = node => {
-            if (Array.isArray(node) || node.constructor.name == 'Collection') {
-                Object.defineProperty(node, 'new', {
-                    configurable: true,
-                    value: function (thing) {
-                        crawl(thing, monitor)
-                        this.push(thing)
-                        agent.emit(`update.${index}`)
-                    }
-                })
-            } else {
-                Object.defineProperty(node, 'set', {
-                    configurable: true,
-                    value: function (attributes) {
-                        Object.assign(this, attributes)
-                        crawl(this, monitor)
-                        if (this._onChange) this._onChange()
-                        else agent.emit(`update.${index}`)
-                    }
-                })
-            }
+            Object.defineProperty(node, 'set', {
+                configurable: true,
+                value: function (attributes) {
+                    Object.assign(this, attributes)
+                    crawl(this, monitor)
+                    if (this._onChange) this._onChange()
+                    else agent.emit(`update.${index}`)
+                }
+            })
         }
         return monitor
     }
@@ -141,7 +109,6 @@ let createUse = () => {
 
 const savedContexts = []
 
-window.savedContexts = savedContexts
 
 const createUseContext = models => context => {
     let pipe;
@@ -223,3 +190,17 @@ let ConnectedComponent = withRouter(({ props = [], models, Component, history, m
     })
     return data.jsx
 })
+
+const primativeTypes = ['String', 'Boolean', 'Number', 'Date', 'Function']
+const isPlain = value => value && typeof value === 'object' && !primativeTypes.includes(value.constructor.name)
+
+
+export const crawl = (obj, callback) => {
+    if (isPlain(obj)) {
+        callback(obj)
+        for (let key in obj) {
+            let value = obj[key]
+            crawl(value, callback)
+        }
+    }
+}

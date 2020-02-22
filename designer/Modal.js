@@ -1,12 +1,14 @@
 import React from 'react';
 import { Portal, Dialog } from 'react-native-paper'
-import { ScrollView } from 'react-native'
+import { ScrollView, Platform } from 'react-native'
+
+const styles = Platform.OS === 'web' ? { maxHeight: `${window.innerHeight}px`} : {};
 
 export default function Modal(props){
     const { children, ...rest} = props
     return (
         <Portal>
-            <Dialog {...rest} style={{ maxHeight: `${window.innerHeight}px`}}>
+            <Dialog {...rest} style={styles}>
                 <ScrollView>
                     {children}
                 </ScrollView>

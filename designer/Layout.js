@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Dimensions, View, ScrollView } from "react-native";
-import { each } from "triframe/mason";
-import { Text } from '.'
+import { Dimensions, View, ScrollView, Text } from "react-native";
+import { Portal } from 'react-native-paper'
 
 
 export const Container = ({ children, style, slim }) => (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{
-        flexGrow: 1, display: 'flex', margin: slim ? 0 : 50, ...style, 
+        flexGrow: 1, display: 'flex', paddingBottom: slim ? 0 : 100 , margin: slim ? 0 : 50, ...style, 
     }}>
+        <Portal.Host />
         {renderChildren(children)}
     </ScrollView>
 )
@@ -59,11 +59,12 @@ export const createGrid = sizes => {
         const { width, height } = useScreenSize(props)
 
         let size = 1
-        each(sizes, ( currentSize, threshold) => {
+        for(let currentSize in sizes){
+            let threshold = sizes[currentSize]
             if(props[currentSize] && ( !size || width > threshold ) ){
                 size = props[currentSize];
             }
-        })
+        }
 
         let styles;
         switch(size){

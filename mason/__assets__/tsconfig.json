@@ -1,0 +1,7 @@
+{
+    "compilerOptions": {
+        "outDir": "./no-op",
+        "experimentalDecorators": true,
+        "allowJs": true
+    }
+}

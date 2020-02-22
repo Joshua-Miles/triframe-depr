@@ -1,6 +1,6 @@
 import React from 'react'
 import { Card, Chip as RNPChip, List } from 'react-native-paper'
-import { View } from '.'
+import { View } from 'react-native'
 
 const Chip = ({ children, ...props}) => (
     <View style={{ flexDirection: 'row' }}>

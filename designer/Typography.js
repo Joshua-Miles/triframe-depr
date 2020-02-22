@@ -1,10 +1,9 @@
 import React from 'react';
 import { Text, Title as Heading, Subheading, Paragraph, Caption } from 'react-native-paper'
-
 const Title = ({ children }) => (
-    <Heading style={{ fontSize: 40, marginTop: 10, marginBottom: 10 }}>
+    <Text style={{ fontSize: 60, marginTop: 10 }}>
         {children}
-    </Heading>
+    </Text>
 )
 
 export {

@@ -1,287 +1,236 @@
-import { jsonpatch, JSONPatchOT } from './jsonpatch'
-import { EventEmitter } from '../herald';
-import { map, filter } from '../mason';
-import { markersFor } from './Markers'
-import { SessionRequest } from './SessionRequest';
-import { List } from '../librarian';
-const skippedPrototypes = [Object.prototype, Function.prototype, EventEmitter.prototype]
-const skippedProperties = ['prototype', 'constructor']
+import { each, map, filter, EventEmitter, getMetadata } from '../core'
+import { Resource } from './Resource'
+import { appendPatches, commitBatch, mergePatches, stageNewPatches, createBatch } from './core'
+
 const primativeTypes = ['String', 'Boolean', 'Number', 'Date', 'Function']
+const skippedPrototypes = [Object.prototype, Function.prototype, Resource.prototype, Resource, EventEmitter.prototype, undefined, null]
+const skippedProperties = target => (
+    typeof target === 'function'
+        ? ['length', 'name', 'prototype']
+        : ['constructor', '[[attributes]]', '[[patches]]', '[[base]]', '[[batch]]', '[[validation]]']
+)
 
-export class Serializer {
+export const createSerializer = io => {
 
-    agent = new EventEmitter
-    dependencies = new Array
-    patches = new Object
-
-    constructor(types) {
-        this.interface = {
-            types: map(types, (name, Type) => this.serializeType(Type, this.agent.of(name))),
-            dependencies: this.dependencies
-        }
+    const serialize = function ($interface) {
+        if (!isObject($interface)) throw Error('$interface must be a plain JavaScript Object')
+        return serializeObject('global', $interface)
     }
 
-    serializeType(Type, agent) {
-        this.CurrentType = Type
-        const instance = new Type
-        const name = Type.name
-        this.currentPlacement = 'class'
-        const classProperties = this.serializeObject(`${name}.`, Type, agent.of('class'))
-        this.currentPlacement = 'instance'
-        const instanceProperties = this.serializeObject(`${name}#`, instance, agent.of('instance'))
+    const serializeObject = function (name, object) {
+        let descriptors = {}
+        let $interface = {}
+        for (let target = object; !skippedPrototypes.includes(target); target = target.__proto__) {
+            each(Object.getOwnPropertyDescriptors(target), (key, descriptor) => {
+                if (!skippedProperties(target).includes(key)) {
+                    $interface[key] = object[key]
+                    descriptors[key] = descriptor
+                }
+            })
+        }
+        return map($interface, (key, value) => {
+            const descriptor = descriptors[key]
+            const metadata = getMetadata(object, key)
+            const { accessLevel } = metadata;
+            if (accessLevel === 'private') return null
+            if (isClass(value, descriptor)) return serializeClass(`${name}/${key}`, value, descriptor, metadata, object, key)
+            if (isObject(value, descriptor)) return serializeObject(`${name}/${key}`, value, descriptor, metadata, object, key)
+            if (isFunction(value, descriptor)) return serializeFunction(`${name}/${key}`, value, descriptor, metadata, object, key)
+            if (isProperty(value, descriptor)) return serializeProperty(`${name}/${key}`, value, descriptor, metadata, object, key)
+            if (isAttribute(value, descriptor)) return serializeAttribute(`${name}/${key}`, value, descriptor, metadata, object, key)
+        })
+    }
+
+    const serializeClass = function (name, Class) {
+        const instance = new Class
         return {
             name,
-            classProperties,
-            instanceProperties
+            type: 'class',
+            className: Class.name,
+            classMethods: serializeMethods(name, Class),
+            instanceMethods: {
+                ...serializeMethods(`${name}/#`, instance), sync: serializeFunction(
+                    `${name}/#/sync`, instance.sync, {}, {}, instance
+                )
+            }
+
         }
     }
 
-    serializeObject(name, original, agent) {
-        let props = {}, target = original
-        do {
-            if (!skippedPrototypes.includes(target)) {
-                props = {
-                    ...props,
-                    ...filter(map(
-                        filter(Object.getOwnPropertyDescriptors(target), key => !skippedProperties.includes(key)),
-                        (key, descriptor) => this.serializeProperty(`${name}${key}`, descriptor, agent.of(key))
-                    ))
+
+    const serializeMethods = function (name, object) {
+        let descriptors = {}
+        for (let target = object; !skippedPrototypes.includes(target); target = target.__proto__) {
+            each(Object.getOwnPropertyDescriptors(target), (key, descriptor) => {
+                if (!skippedProperties(target).includes(key)) {
+                    descriptors[key] = descriptor
                 }
-            }
-        } while (target = Object.getPrototypeOf(target));
-
-        return props
+            })
+        }
+        return map(descriptors, (key, descriptor) => {
+            const metadata = getMetadata(object, key)
+            if (isObject(descriptor.value, descriptor)) return serializeObject(`${name}/${key}`, descriptor.value, descriptor, metadata, object, key)
+            if (isFunction(descriptor.value, descriptor)) return serializeFunction(`${name}/${key}`, descriptor.value, descriptor, metadata, object, key)
+            if (isProperty(descriptor.value, descriptor)) return serializeProperty(`${name}/${key}`, descriptor.value, descriptor, metadata, object, key)
+            if (isAttribute(descriptor.value, descriptor)) return serializeAttribute(`${name}/${key}`, descriptor.value, descriptor, metadata, object, key)
+        })
     }
 
-    serializeProperty(name, descriptor, agent) {
-        let { markers, booleanMarkers } = this.markersFor(name)
-        if (!markers.authorize && !markers.publish && !markers.shared) {
-            return undefined
-        }
 
-        if (typeof descriptor.value == 'function') {
+    const serializeFunction = function (name, value, descriptor, metadata, parent) {
+        const { isShared, accessLevel, authCheck, usesSession } = metadata;
+        if (isShared) {
             return {
                 name,
-                type: 'method',
-                value: this.serializeFunction(name, descriptor.value, markers, agent),
-                markers: booleanMarkers
-            }
-        }
-
-        else if (typeof descriptor.get == 'function' || typeof descriptor.set == 'function') {
-            return {
-                name,
-                type: 'property',
-                value: {
-                    get: descriptor.get && this.serializeFunction(name, descriptor.get, markers, agent),
-                    set: descriptor.set && this.serializeFunction(name, descriptor.set, markers, agent)
-                },
-                markers: booleanMarkers
-            }
-        }
-
-        else {
-            return {
-                name,
-                type: 'attribute',
-                value: descriptor.value,
-                markers: booleanMarkers
-            }
-        }
-    }
-
-    serializeFunction(name, func, markers, agent) {
-        const callCache = {}
-        let { shared, session, authorize, publish, stream } = markers;
-        
-        if (session && shared) throw Error('A function cannot be shared and access the session')
-        if (authorize && shared) throw Error('A function cannot be shared and require authorization')
-        if (authorize && publish) throw Error('A function cannot be publish and require authorization')
-        const cache = (!session && stream);
-
-        if (shared) {
-            let dependencies = shared
-            let dependencyNames = Object.keys(dependencies)
-            let dependencyValues = Object.values(map(dependencies, (key, value) => this.storeDependency(value)))
-            return {
-                dependencyNames: dependencyNames,
-                dependencyValues: dependencyValues,
-                code: func.toString()
+                type: 'shared-function',
+                value: value.toString()
             }
         } else {
-            const Type = this.CurrentType;
-            const currentPlacement = this.currentPlacement;
-            agent.on('call', async ({ socket, requestId, instanceId, args, id, patches, includes, timestamp, attributes, session, emit }) => {
-                // Create a unique identifier for this method call
-                let hash = JSON.stringify({ args, id })
-
-                // Create the object of the request
-                let createTarget = async() => {
-                    let namespace = `${Type.name}.${id}`
-                    let target
-                    if(currentPlacement == 'class') target = Type 
-                    else if(Number.isInteger(id)) target = this.instanceCache[instanceId] || await Type.find(id, includes) 
-                    else target = new Type
-                    try { 
-                        if(this.patches[namespace]){
-                            // let otherPatches = this.patches[namespace].reduce( (patches, request) => {
-                            //     if(request.timestamp > timestamp && request.socketId != socket.id){
-                            //         patches.push(...request.patches)
-                            //     }
-                            //     return patches
-                            // }, [])
-                            // patches = JSONPatchOT.transform(patches, otherPatches);
-                        }
-                        patches.forEach( op => {
-                            op.sender = socket.id
-                            try{
-                                jsonpatch.applyOperation(target, op) 
-                            } catch(err){
-                                console.log(err)
-                            }
-                        })
-                        if(id) {
-                            this.patches[namespace] = this.patches[namespace] || []
-                            this.patches[namespace].push({ patches, timestamp, socketId: socket.id })
-                        }
-                    } catch (err) { console.log('ERROR:', err) }
-                    if (attributes) Object.assign(target, attributes)
-                    target.patches = patches
-                    return target
+            io.on(name, async ({ args, uid, patches, connection, send, onClose }) => {
+                connection.cache = connection.cache || createCache(connection)
+                const sendSerialized = (value, keepOpen) => {
+                    if (usesSession) connection.session.save()
+                    send(serializeDocument(value, connection), keepOpen)
                 }
 
-                // Process a document and opened pipe for response
-                let sendResponse = ({document, pipe}) => {
+                const target = (
+                    uid
+                        ? connection.cache.getCached(uid)
+                        : typeof parent === 'function' ? parent : new parent.constructor
+                )
 
-                    // Cache result if it has not been cached yet
-                    if(cache && !callCache[hash]) callCache[hash] = {
-                        get document() {
-                            return document
-                        },
-                        get pipe() {
-                            return pipe
-                        }
-                    }
-                 
+                if (patches) appendPatches(target, patches)
 
-                    let serialized = this.serializeDocument(document, session, `${socket.id}.${requestId}`)
-                    emit({ body: serialized, timestamp: (new Date).getTime() })
-                    
-                    // Emit updates to the requestor
-                    if (pipe && pipe.observe) {
-                        let emitUpdate = newDocument => {
-                            if(newDocument && newDocument.$patch){
-                                jsonpatch.applyPatch(serialized, newDocument.$patch)
-                                return emit({ body: newDocument.$patch.filter(op => op.sender !== socket.id)})
-                            }
-                            if(name == 'Document.content') console.log("AND HERE----")
-                            document = newDocument
-                            let newSerialized = this.serializeDocument(newDocument, session, `${socket.id}.${requestId}`)
-                            if(newSerialized && serialized){
-                                let patch = jsonpatch.compare(serialized, newSerialized)
-                                emit({ body: patch, timestamp: (new Date).getTime() })
-                            } else {
-                                emit({ body: newSerialized, timestamp: (new Date).getTime()})
-                            }
-                            serialized = newSerialized
-                        }
-                        pipe.observe(emitUpdate)
-
-                        // Unobserve the pipe.
-                        // Destroy the pipe if it is ambandoned
-                        socket.on('disconnect', () => {
-                            pipe.unobserve(emitUpdate)
-                            if (pipe.observers.length == 0) {
-                                delete callCache[hash]
-                                pipe.destroy()
-                            }
-                        })
-                    }
+                if (accessLevel === 'private' || (accessLevel === 'protected' && ! await authCheck(connection.session, target))) {
+                    return send({ error: true, message: 'You are not authorized to call this method' })
                 }
 
-                // Check method authorization
-                if (authorize) {
-                    let authorizer, message;
-                    if (typeof authorize === 'function') authorizer = authorize, message = 'You are not authorized for the requested action'
-                    else authorizer = authorize.unless, message = authorize.message
-                    if (!authorizer(session)) return emit({ error: true, message })
+                if (usesSession) args.unshift(connection.session)
+                let result;
+                try {
+                    result = value.apply(target, args)
+                } catch (err) {
+                    send({ error:true, message: err.message })
                 }
+                if(result && result.catch) result.catch( err => send({ error:true, message: err.message }))
+                if (isPipe(result)) {
+                    result.observe(value => sendSerialized(value, true))
+                    onClose(() => result.destroy())
+                } else if (isPromise(result)) {
+                    result.then(value => sendSerialized(value))
+                } else {
+                    sendSerialized(result)
+                }
+            })
+            return {
+                name,
+                type: 'remote-function'
+            }
+        }
+    }
 
-                // Check for a cached result
-                if (cache && callCache[hash]) return sendResponse(callCache[hash])
+    const serializeProperty = function (name, value, descriptor, metadata, object, key) {
+        const { validators } = metadata
+        return {
+            name,
+            key: key,
+            type: 'property',
+            get: serializeFunction(`${name}.get`, descriptor.get || (() => null), descriptor, metadata, object),
+            set: serializeFunction(`${name}.set`, descriptor.set || (() => null), descriptor, metadata, object),
+            validators: validators && validators.map(validator => validator.toString())
 
-                // Call the method
-                let pipe = func.apply(await createTarget(), args)
-                
-                // Send any non-pipe/promise response immediately
-                if (!pipe || !pipe.then) return sendResponse({ document: pipe, pipe: null })
-                    
-                // Catch any requests for the session. 
-                // This will always be reached for methods that can access the session
-                // as they cannot be cached
-                pipe.catch(err => {
-                    if (err instanceof SessionRequest) {
-                        err.callback(session)
-                    } else {
-                        emit({ error: true, message: err.message })
-                    }
-                })
+        }
+    }
 
-                pipe.then(document => sendResponse({ document, pipe }))
-                
+    const serializeAttribute = function (name, value, descriptor, metadata, object, key) {
+        const { validators } = metadata
+        return {
+            name,
+            key: key,
+            type: 'attribute',
+            value: descriptor.value,
+            validators: validators && validators.map(validator => validator.toString())
+        }
+    }
+
+    const serializeDocument = function (document, connection) {
+        const next = document => serializeDocument(document, connection)
+        if (!document) return document
+        if (isClass(document)) return { _class_: document.name }
+        if (isPrimative(document)) return document
+        if (isArray(document)) return document.map((element, index) => next(element))
+        if (isObject(document)) return map(document, (propertyName, object) => next(object))
+
+        connection.cache.cache(document)
+
+        if (isDocument(document)) return {
+            ...map(document['[[attributes]]'], (propertyName, object) => {
+                const metadata = getMetadata(document, propertyName)
+                const { accessLevel, authCheck } = metadata;
+                if (accessLevel == 'private') return null
+                if (accessLevel == 'protected' && !authCheck(connection.session)) return null
+                return next(object)
+            }),
+            _proto_: document.constructor.name
+        }
+    }
+
+    return serialize
+}
+
+const isPrimative = value => primativeTypes.includes(value.constructor.name)
+const isClass = (value) => typeof value === 'function' && value.prototype instanceof Resource
+const isDocument = value => value instanceof Resource
+const isArray = value => Array.isArray(value)
+const isObject = (value) => value && value.__proto__ === Object.prototype
+const isFunction = (value) => typeof value === 'function' && !isClass(value)
+const isProperty = (value, descriptor) => typeof descriptor.get === 'function' || typeof descriptor.set === 'function'
+const isAttribute = (value, descriptor) => [isClass, isObject, isFunction, isProperty].every(isType => !isType(value, descriptor))
+const isPipe = value => value && typeof value.observe == 'function'
+const isPromise = value => value && typeof value.then == 'function' && !isPipe(value)
+
+const global = {}
+
+const createCache = ({ socket }) => {
+
+    const bin = {}
+
+
+    function cache(resource) {
+        if (!bin[resource.uid]) {
+            bin[resource.uid] = resource
+            global[resource.uid] = global[resource.uid] || []
+            global[resource.uid].push({ socket, resource })
+
+            socket.on(`${resource.uid}.sync`, ({ batchId, patches }) => {
+                appendPatches(resource, patches)
+                sync(batchId)
+                // TODO: DONT RECONCILE CHANGES UNTIL ALL PENDING UPDATES HAVE BEEN CONFIRMED (?)
+                socket.emit(`${resource.uid}.commitBatch`, batchId)
+            })
+
+            resource.on('Δ.sync', () => {
+                stageNewPatches(resource)
+                const batchId = createBatch(resource)
+                sync(batchId, { includeSelf: true })
+            })
+        }
+
+
+        const sync = (batchId, { includeSelf = false } = {}) => {
+            const patches = commitBatch(resource, batchId)
+            global[resource.uid].forEach(({ socket: otherSocket, resource }) => {
+                if (socket != otherSocket || includeSelf) {
+                    mergePatches(resource, patches)
+                    otherSocket.emit(`${resource.uid}.mergePatches`, patches)
+                }
             })
         }
     }
 
-    instanceCache = {}
-
-    serializeDocument(document, session, instanceId, propertyName = false) {
-        if (propertyName && session) {
-            let { authorize, publish } = markersFor(propertyName)
-            if (authorize && publish) throw Error('A field cannot be publish and require authorization')
-            if (authorize) {
-                let authorizer, message;
-                if (typeof authorize === 'function') authorizer = authorize, message = 'You are not authorized for the requested action'
-                else authorizer = authorize.unless, message = authorize.message
-                if (!authorizer(session)) return undefined
-            }
-            if (!authorize && !publish && !propertyName.startsWith('Collection') && !propertyName.startsWith('List') && !propertyName.includes('_') && !propertyName.startsWith('Object') && !propertyName.startsWith('Array')) {
-                //console.log('blocked', propertyName)
-                return undefined
-            } else {
-                //console.log(propertyName)
-            }
-            // if(propertyName.startsWith('Collection')) console.log(propertyName, document)
-        }
-        if (typeof document === 'function') return {
-            __type__: document.name
-        }
-        if (!document) return document
-        this.cacheInstance(document, `${instanceId}/${propertyName}`)
-        if (primativeTypes.includes(document.constructor.name)) return document
-        if(Array.isArray(document)) return document.map( (element, index) => this.serializeDocument(element, session, instanceId, `${document.constructor.name}#${index}`))
-        return {
-            ...map(document, (propertyName, object) => this.serializeDocument(object, session, instanceId, `${document.constructor.name}#${propertyName}`)),
-            __class__: document.constructor.name,
-            __index__: document.__index__,
-            __IID__: `${instanceId}/${propertyName}`
-        }
+    function getCached(uid) {
+        return bin[uid]
     }
 
-    cacheInstance(instance, socketId){
-        this.instanceCache[socketId] = instance
-    }
-
-    storeDependency(data) {
-        let index = this.dependencies.findIndex(dependency => dependency == data)
-        if (index == -1) index = this.dependencies.push(data) - 1
-        return index
-    }
-
-    markersFor(name) {
-        let markers = markersFor(name)
-        let booleanMarkers = map(markers, (key, value) => !!value)
-        return { markers, booleanMarkers }
-    }
-
+    return { cache, getCached }
 }

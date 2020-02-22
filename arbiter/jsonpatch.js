@@ -1,4 +1,7 @@
 /*! fast-json-patch, version: 2.1.0 */
+
+import { List } from "./List";
+
 export const jsonpatch =
 /******/ (function(modules) { // webpackBootstrap
 /******/ 	// The module cache
@@ -118,7 +121,13 @@ exports._objectKeys = _objectKeys;
 function _deepClone(obj) {
     switch (typeof obj) {
         case "object":
-            return JSON.parse(JSON.stringify(obj)); //Faster than ES5 clone - http://jsperf.com/deep-cloning-of-objects/5
+            return JSON.parse(JSON.stringify(obj), (key, value) => {
+                if(Array.isArray(value)){
+                    return new List(...value)
+                } else {
+                    return value
+                }
+            }); //Faster than ES5 clone - http://jsperf.com/deep-cloning-of-objects/5
         case "undefined":
             return null; //this is how JSON.stringify behaves for array items
         default:
@@ -1074,16 +1083,68 @@ export const JSONPatchOT = (function(){
                 currentOp++;
   
                 if(originalOp.path.indexOf(arrayPath) === 0){//item from the same array
-                  originalOp.path = replacePathIfHigher(originalOp.path, arrayPath, index);
+                  originalOp.path = replacePathIfHigher(originalOp.path, arrayPath, index, -1);
                 }
                 if(originalOp.from && originalOp.from.indexOf(arrayPath) === 0){//item from the same array
-                  originalOp.from = replacePathIfHigher(originalOp.from, arrayPath, index);
+                  originalOp.from = replacePathIfHigher(originalOp.from, arrayPath, index, -1);
                 }
               }
             }
           }
   
         },
+
+        add: function(patchOp, original){
+            debug && console.log("Transforming ", JSON.stringify(original) ," against `remove` ", patchOp);
+            var orgOpsLen = original.length, currentOp = 0, originalOp;
+            // remove operation objects
+            while (originalOp = original[currentOp]) {
+    
+    
+              // TODO: `move`, and `copy` (`from`) may not be covered well (tomalec)
+              debug && console.log("TODO: `move`, and `copy` (`from`) may not be covered well (tomalec)");
+              if( (originalOp.op === 'add' || originalOp.op === 'test') && patchOp.path === originalOp.path ){
+                // do nothing ? (tomalec)
+              } else
+              // node in question was removed
+              if( originalOp.from &&
+                      (originalOp.from === patchOp.path || originalOp.from.indexOf(patchOp.path + "/") === 0 ) ||
+                  ( patchOp.path === originalOp.path || originalOp.path.indexOf(patchOp.path + "/") === 0 ) ){
+                debug && console.log("Removing ", originalOp);
+                original.splice(currentOp,1);
+                orgOpsLen--;
+                currentOp--;
+              }
+              currentOp++;
+            }
+            // shift indexes
+            // var match = patchOp.path.match(/(.*\/)(\d+)$/); // last element is a number
+            var lastSlash = patchOp.path.lastIndexOf("/");
+            if( lastSlash > -1){
+              var index = patchOp.path.substr(lastSlash+1);
+              var arrayPath = patchOp.path.substr(0,lastSlash+1);
+              if( isValidIndex(index)){
+                debug && console.warn("Bug prone guessing that, as number given in path, this is an array!");
+    
+                debug && console.log("Shifting array indexes");
+                orgOpsLen = original.length;
+                currentOp = 0;
+                while (currentOp < orgOpsLen) {
+                  originalOp = original[currentOp];
+                  currentOp++;
+    
+                  if(originalOp.path.indexOf(arrayPath) === 0){//item from the same array
+                    originalOp.path = replacePathIfHigher(originalOp.path, arrayPath, index, +1);
+                  }
+                  if(originalOp.from && originalOp.from.indexOf(arrayPath) === 0){//item from the same array
+                    originalOp.from = replacePathIfHigher(originalOp.from, arrayPath, index, +1);
+                  }
+                }
+              }
+            }
+    
+          },
+
         replace: function(patchOp, original){
           debug && console.log("Transforming ", JSON.stringify(original) ," against `replace` ", patchOp);
           var currentOp = 0, originalOp;
@@ -1108,7 +1169,7 @@ export const JSONPatchOT = (function(){
   
         }
       };
-      function replacePathIfHigher(path, repl, index){
+      function replacePathIfHigher(path, repl, index, modifier){
         var result = path.substr(repl.length);
         // var match = result.match(/^(\d+)(.*)/);
         // if(match && match[1] > index){
@@ -1116,8 +1177,8 @@ export const JSONPatchOT = (function(){
         eoindex > -1 || (eoindex = result.length);
         var oldIndex = result.substr(0, eoindex);
         var rest  = result.substr(eoindex);
-        if(isValidIndex(oldIndex) && oldIndex > index){
-          return repl + (oldIndex -1) + rest;
+        if(isValidIndex(oldIndex) && (modifier > 0 && oldIndex >= index) || (modifier < 0 && oldIndex > index)){
+          return repl + (parseInt(oldIndex) + modifier) + rest;
         } else {
           return path;
         }

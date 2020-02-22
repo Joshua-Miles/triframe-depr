@@ -1,13 +1,10 @@
 // Native and Platform Components
 import { View, TouchableOpacity, Platform, ScrollView, Animated, PanResponder, Modal as LegacyModal } from 'react-native'
-import { Route, Switch, Redirect } from 'react-router'
-import { Router, Link } from './platform'
+
+require('./platform')
 
 // Native Paper Components
-import { Appbar, Avatar, Menu, Divider, Badge, RadioButton, Snackbar, Portal, ProgressBar, Checkbox } from 'react-native-paper';
-
-// 
-import { Provider, tether } from './Provider'
+import { Provider as StyleProvider, Appbar, Avatar, Menu, Divider, Badge, RadioButton, Snackbar, Portal, ProgressBar, Checkbox } from 'react-native-paper';
 
 // Custom Components
 import TextEditor from './TextEditor'
@@ -15,13 +12,16 @@ import Drawer from './Drawer'
 import Modal from './Modal'
 import { Card, Chip, List } from './Material'
 import { createGrid, Container, Section, Area } from './Layout'
-import { Button, BubbleButton, ToggleButton, FileInput } from './Button'
+import { Button, BubbleButton, ToggleButton } from './Button'
 import { Text, Title, Heading, Subheading, Paragraph, Caption } from './Typography'
-import { TextInput, PasswordInput, TextField, HelperText, ToggleSwitch } from './Form'
+import { TextInput, PasswordInput, TextField, HelperText, ToggleSwitch, FileInput } from './Form'
+
+import { Route } from 'react-router';
+import { Router } from './Router';
+import { Provider, tether } from './Provider';
+
 
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons'
-import { DateTimeInput } from './DateTimeInput/index.web';
-
 
 const { Grid, Column } = createGrid({
     xs: 0,
@@ -32,7 +32,16 @@ const { Grid, Column } = createGrid({
 })
 
 
+
+
 export {
+    Provider,
+
+    tether,
+
+    Route, 
+
+    StyleProvider,
 
     Checkbox,
 
@@ -48,10 +57,7 @@ export {
     TextEditor,
 
     // Low Level
-    Platform, Provider, tether,
-
-    // Routing
-    Router, Route, Redirect, Link, Switch,
+    Platform,
 
     // Layout
     View, Container, Section, Area, Grid, Column, Divider,
@@ -66,7 +72,7 @@ export {
     Button, BubbleButton, ToggleButton,
 
     // Form
-    TextInput, PasswordInput, FileInput, DateTimeInput, TextField, HelperText, ToggleSwitch, RadioButton,
+    TextInput, PasswordInput, TextField, HelperText, ToggleSwitch, RadioButton, FileInput,
 
     // Material
     Chip, Card, List,

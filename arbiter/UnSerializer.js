@@ -1,252 +1,167 @@
-import { jsonpatch } from './jsonpatch'
-import { EventEmitter, Pipe } from '../herald';
-import { map, each, filter, index } from '../mason'
-import { snapshot } from "../mason";
-import { memoize } from '../herald/memoize';
-import { Collection } from '../librarian/Collection';
-import { List } from '../librarian/List';
+import { each, map, Pipe } from "../core"
+import { List } from "./List"
+import { Resource } from "./Resource"
+import { stageNewPatches, createBatch, commitBatch, mergePatches } from "./core"
 
 
-let compare = (obj1, obj2) => {
-    let patches = jsonpatch.compare(obj1, obj2)
-    return patches.filter(patch => !patch.path.includes('__'))
-}
+const primativeTypes = ['String', 'Boolean', 'Number', 'Date', 'Function']
 
-let PENDING_VALUE = Symbol()
-export class UnSerializer {
+export const createUnserializer = io => {
 
-    nodes = {}
+    const cache = createCache({ socket: io })
 
+    const classes = { Resource, List }
 
-    constructor({ dependencies, types }) {
-        if (typeof window !== 'undefined') window.nodes = this.nodes
-
-
-        this.agent = new EventEmitter
-        this.dependencies = dependencies
-
-        this.types = {
-            ...map(types, (key, type) => this.unSerializeType(type, this.agent.of(key))),
-            Collection,
-            List
-        }
-        this.types.Array = Array
-        if (typeof window !== 'undefined') Object.assign(window, this.types)
+    const unserialize = (schema) => {
+        if (typeof schema !== 'object') throw Error('schema must be a plain JavaScript Object')
+        return unserializeObject(classes, schema)
     }
 
-    unSerializeType({ name, classProperties, instanceProperties }, agent) {
-        const Type = class {
-            constructor(attributes) {
-                Object.assign(this, attributes)
-            }
-        }
-        Object.defineProperty(Type, 'name', { value: name })
-        this.unSerializeObject(Type, classProperties, agent.of('class'))
-        this.unSerializeObject(Type.prototype, instanceProperties, agent.of('instance'))
-        return Type
+    const unserializeClass = (schema) => {
+        const Class = class extends Resource { }
+        Object.defineProperty(Class, 'name', { value: schema.className })
+        unserializeObject(Class, schema.classMethods)
+        unserializeObject(Class.prototype, schema.instanceMethods)
+        return Class;
     }
 
-    unSerializeObject(target, properties, agent) {
 
-        each(properties, (key, property) => {
-            if (!target.hasOwnProperty(key)) {
-                Object.defineProperty(target, key, this.unSerializeProperty(property, agent.of(key)))
+    const unserializeObject = (target, schema) => {
+        each(schema, (key, schema) => {
+            switch (schema.type) {
+                case 'class':
+                    target[key] = unserializeClass(schema)
+                break;
+                case 'object':
+                    target[key] = unserializeObject({}, schema)
+                break;
+                case 'shared-function':
+                    target[key] = unserializeSharedFunction(schema)
+                break;
+                case 'remote-function':
+                    target[key] = unserializeRemoteFunction(schema)
+                break;
+                case 'property':
+                    unserializeProperty(target, key, schema)
+                break;
+                case 'attribute':
+                    target[key] = unserializeAttribute(schema, target)
+                break;
             }
+        })
+        return target
+    }
+
+    const unserializeFunction = (schema) => {
+        switch (schema.type) {
+            case 'shared-function':
+                return unserializeSharedFunction(schema)
+                break;
+            case 'remote-function':
+                return unserializeRemoteFunction(schema)
+                break;
+        }
+    }
+
+    const unserializeSharedFunction = (schema) => {
+        return new Function(`return ${schema.value}`)()
+    }
+
+    const unserializeRemoteFunction = (schema) => {
+        const { name } = schema
+
+        const remoteProcess = function (emit, args) {
+            const { uid } = this;
+            const patches = this.getNewPatches ? this.getNewPatches() : []
+            const emitUnserialized = value => {
+                if(value && value.error) emit.throw(new Error(value.message))
+                let document = unserializeDocument(value, () => emit(document))
+                emit(document)
+            }
+            io.emit(name, { uid, patches, args }, ({ value, hook }) => {
+                emitUnserialized(value)
+                if(hook !== undefined) io.on(hook, ({ value }) => emitUnserialized(value))
+            })
+            io.on('reconnect', () => {
+                io.emit(name, { uid, patches, args }, ({ value, hook }) => {
+                    emitUnserialized(value)
+                    if(hook !== undefined) io.on(hook, ({ value }) => emitUnserialized(value))
+                })
+            })
+        }
+
+        return function (...args) {
+            return new Pipe([this, remoteProcess], args)
+        }
+    }
+
+    const unserializeProperty = (target, key, schema) => {
+        const { validation } = target
+        if(validation && schema.validators){
+            schema.validators.forEach( validator => {
+                validation.addHandler(schema.key, unserializeSharedFunction({ value: validator }) )
+            })
+        }
+        Object.defineProperty(target, key, {
+            get: unserializeFunction(schema.get),
+            set: unserializeFunction(schema.set)
         })
     }
 
-    unSerializeProperty({ name, type, value, markers }, agent) {
-        switch (type) {
-            case 'method':
-                return {
-                    value: this.unSerializeFunction(name, value, markers, agent)
-                }
-                break;
-            case 'property':
-                let getter = this.unSerializeFunction(name, value.get, markers, agent)
-                let setter = this.unSerializeFunction(name, value.set, markers, agent)
-                return {
-                    get: value.get ? getter : function () {
-                        return getter.call(this)
-                    },
-                    set: value.set ? setter : function (value) {
-                        return setter.call(this, value)
-                    }
-                }
-                break;
-            case 'attribute':
-                return {
-                    writable: true,
-                    value: value
-                }
-                break;
+    const unserializeAttribute = (schema, target) => {
+        const { validation } = target
+        if(validation && schema.validators){
+            schema.validators.forEach( validator => {
+                validation.addHandler(schema.key, unserializeSharedFunction({ value: validator }) )
+            })
         }
+        return schema.value
     }
 
-    unSerializeFunction(name, func, markers, agent) {
-        const serializer = this
-        const { shared, stream } = markers
-        const cache = stream;
-        if (shared && func) {
-            const { code, dependencyNames, dependencyValues } = func
-            let dependencies = dependencyValues.map(index => this.dependencies[index])
-            return new Function(...dependencyNames, `return (${code})`)(...dependencies)
-        } else {
-
-            let bin = []
-            const method = function (...args) {
-                let newPipe = new Pipe([this, ambassador], ...args)
-                // if (cache) {
-                //     let cached = bin.find( pipe => pipe.isEqual(newPipe))
-                //     if (cached) {
-                //         newPipe.destroy()
-                //         return cached
-                //     }
-                //     bin.push( newPipe )
-                // }
-                return newPipe
-            }
-
-
-            const ambassador = function* (emit, ...args) {
-                let patches = []
-                let base = PENDING_VALUE;
-
-                serializer.nodes[name] = {
-                    get patches() {
-                        return patches
-                    },
-                    get base() {
-                        return base
-                    },
-                    get emitDocument() {
-                        return emitDocument
-                    }
-                }
-
-                const handleResponse = function (response) {
-                    if (response && response.error) {
-                        return emit.throwError(new Error(response.message))
-                    }
-                    if (base === PENDING_VALUE || !base) {
-                        base = response
-                        emitDocument()
-                    } else if (response) {
-                        let docChanged = reconcileOperations(response)
-                        if (docChanged) {
-                            emitDocument()
-                        }
-                    } else {
-                        base = response
-                        emitDocument()
-                    }
-                }
-
-                const emitDocument = function () {
-                    
-                    setTimeout(() => {
-                        let result = base;
-                        if (typeof base == 'object') {
-                            try {
-                                let clone = snapshot(base)
-                                jsonpatch.applyPatch(clone, patches)
-                                result = unSerializeDocument(clone)
-                            } catch (err) { console.warn(err) }
-                        }
-                        emit(result)
-                    }, 10 / 1000)
-                }
-
-                const onChange = function (diff) {
-                    patches.push(...diff)
-                    patches = optimizePatches(patches)
-                    emitDocument()
-                }
-
-                const reconcileOperations = function (ops) {
-                    let changed = false
-                    let reconciliationPatch = []
-                    ops.forEach((op) => {
-                        reconciliationPatch.push(op)
-                        for (let index in patches) {
-                            let patch = patches[index];
-                            if (op.op == 'remove' && patch.path.startsWith(op.path)) {
-                                delete patches[index]
-                            }
-                            if (compare(op, patch).length == 0) {
-                                delete patches[index]
-                                return;
-                            }
-                        }
-                        changed = true
-                    })
-                    jsonpatch.applyPatch(base, reconciliationPatch)
-                    patches = patches.filter(x => x)
-                    return changed
-                }
-
-
-                const optimizePatches = patches => {
-                    //return patches
-                    let bin = {}
-                    let temp = base
-                    patches.forEach(patch => {
-                        if (bin[patch.path] && bin[patch.path].op == 'add' && patch.op == 'remove') {
-                            delete bin[patch.path]
-                        } else {
-                            let previous = temp
-                            temp = snapshot(temp)
-                            jsonpatch.applyPatch(temp, [patch])
-                            let patches = compare(previous, temp)
-                            let changesBase = !!patches.length
-                            if (changesBase) {
-                                bin[patch.path] = patch
-                            }
-                        }
-                    })
-                    return Object.values(bin);
-                }
-
-                const unSerializeDocument = (document, path = '') => {
-                    if (!document) return document
-                    if (document.__type__) return serializer.types[document.__type__]
-                    if (!document.__class__ && typeof document != 'object') return document
-                    if (Array.isArray(document)) return document.map((doc, index) => unSerializeDocument(doc, `${path}/${index}`))
-                    let response = serializer.types[document.__class__] ? new serializer.types[document.__class__] : new Object
-                    Object.assign(response, map(document, (propertyName, document) => unSerializeDocument(document, `${path}/${propertyName}`)))
-                    let resultSnapshot = snapshot(response)
-                    Object.defineProperty(response, '_onChange', {
-                        value: function () {
-                            let patches = compare(resultSnapshot, response)
-                            jsonpatch.applyPatch(resultSnapshot, patches)
-                            // These patches may not be necessary if the base already has the update from the server
-                            // Once staged, these patches will NEVER be reconciled because the server has already re-based them
-                            // This creates a memory and cpu leak where the patch list grows without ever rebasing
-                            this.patches.push(...patches)
-                            let adjustedPatches = patches.map(patch => ({ ...patch, path: `${path}${patch.path}` }))
-                            onChange(adjustedPatches)
-                        }
-                    })
-                    // TODO: This is wrong (not scoped correctly, only works if response is the top of the node)
-                    Object.defineProperty(response, 'patches', { value: patches })
-                    return response
-                }
-
-                const getPatches = () => this.patches ? this.patches.filter(patch => patch) : [];
-
-                agent.emit('call', {
-                    args,
-                    patches: Number.isFinite(this.id) ? getPatches() : [],
-                    id: this.id,
-                    attributes: Number.isFinite(this.id) ? null : this,
-                    respond: handleResponse
-                })
-
-                try {
-                    this.patches = []
-                } catch (err) { }
-            }
-            return method
-        }
+    const unserializeDocument = (document, callback) => {
+        const next = document => unserializeDocument(document, callback)
+        if(!document) return document
+        if(primativeTypes.includes(document.constructor.name)) return document
+        if(Array.isArray(document)) return new List(...document.map( document => next(document)))
+        const { _class_, _proto_, ...attributes } = document;
+        if(_class_) return classes[__class__]
+        if(_proto_) return cache.register(new classes[_proto_](map(attributes, ( key, value ) => next(value))), callback)
+        return map(attributes, ( key, value ) => next(value))
     }
+
+    return unserialize
+}
+
+
+const createCache = ({ socket }) => {
+
+    function register(resource, callback){
+
+        let timer;
+
+        resource.on('Δ.change', () => {
+            if(timer) clearTimeout(timer)
+            timer = setTimeout(() => {
+                resource.emit('Δ.sync')
+            }, resource['[[syncRate]]'])
+        })
+
+        resource.on('Δ.sync', () => {
+            let patches = stageNewPatches(resource)
+            let batchId = createBatch(resource)
+            socket.emit(`${resource.uid}.sync`, { patches, batchId })
+            callback()
+        })
+
+        socket.on(`${resource.uid}.commitBatch`, (batchId) => {
+            commitBatch(resource, batchId)
+        })
+        socket.on(`${resource.uid}.mergePatches`, (patches) => {
+            mergePatches(resource, patches)
+            callback()
+        })
+        return resource
+    }
+
+    return { register }
 }
