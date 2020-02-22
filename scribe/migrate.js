@@ -3,7 +3,7 @@ import { settings } from './settings'
 
 export const migrate = async () => {
     const database = settings.db
-    const newSchema = map(group(filter(metadata, (_, metadata) => metadata.type === 'persisted'), (_, d) => toTableName(d.className), (_, metadata) => index(metadata, (_, metadata) => toUnderscored(metadata.key)))
+    const newSchema = map(group(filter(metadata, (_, metadata) => metadata.type === 'persisted'), (_, d) => toTableName(d.className)), (_, metadata) => index(metadata, (_, metadata) => toUnderscored(metadata.key)))
     const schema = formatSchema(await database.query(selectSchema()))
     const patch = generatePatch(schema, newSchema)
     if (patch) {
