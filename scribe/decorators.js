@@ -1,4 +1,4 @@
-import { saveMetadata, getMetadata, toForeignKeyName, each, metadata, index, Pipe } from '../core'
+import { saveMetadata, getMetadata, toForeignKeyName, each, metadata, index, Pipe, toCamelCase } from '../core'
 
 //  ---------------------- DATATYPES ----------------------
 
@@ -142,7 +142,7 @@ export const hasOne = createDecorator(({ decoratorArgs: [options = {}], fieldVal
 }))
 
 export const belongsTo = createDecorator(({ decoratorArgs: [options = {}], target, key, fieldValue }) => {
-    let foreignKey = toForeignKeyName(key)
+    let foreignKey = toCamelCase( toForeignKeyName(key) )
     saveMetadata(target, foreignKey, {
         type: 'persisted',
         datatype: 'int4',
