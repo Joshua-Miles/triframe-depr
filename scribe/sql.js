@@ -59,7 +59,9 @@ export const sql = async (queryFragments, ...variables) => {
                 if(sqlDecode) return sqlDecode(value)
                 else return value
             }
-            return new Model(index(value, camelCasedKeys, decodedValues))
+            const ish= new Model(index(value, camelCasedKeys, decodedValues))
+console.log(ish)
+            return ish
         }
         if (Array.isArray(value)) {
             return value.filter(value => value.id !== null)
