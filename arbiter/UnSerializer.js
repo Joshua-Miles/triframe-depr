@@ -80,13 +80,15 @@ export const createUnserializer = io => {
             }
             io.emit(name, { uid, patches, args }, ({ value, hook }) => {
                 emitUnserialized(value)
-                if(hook !== undefined) io.on(hook, ({ value }) => emitUnserialized(value))
-            })
-            io.on('reconnect', () => {
-                io.emit(name, { uid, patches, args }, ({ value, hook }) => {
-                    emitUnserialized(value)
-                    if(hook !== undefined) io.on(hook, ({ value }) => emitUnserialized(value))
-                })
+                if(hook !== undefined){
+                    io.on(hook, ({ value }) => emitUnserialized(value))
+                    io.on('reconnect', () => {
+                        io.emit(name, { uid, patches, args }, ({ value, hook }) => {
+                            emitUnserialized(value)
+                            if(hook !== undefined) io.on(hook, ({ value }) => emitUnserialized(value))
+                        })
+                    })
+                }
             })
         }
 
