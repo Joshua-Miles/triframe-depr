@@ -120,7 +120,7 @@ class Model {
     static async truncate(){
         const { relation } = this;
         return sql`
-            DELETE FROM ${relation} WHERE 1
+            DELETE FROM ${relation} WHERE true
         `
     }
 
