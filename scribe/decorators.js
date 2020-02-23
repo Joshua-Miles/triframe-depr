@@ -129,6 +129,7 @@ export const virtual = createDecorator(({ decoratorArgs: [definition], target, k
 export const hasMany = createDecorator(({ decoratorArgs: [options = {}], target, key, fieldValue }) => {
     Object.defineProperty(target, key, createDocumentProperty(key))
     return {
+        isShared: true,
         type: 'relationship',
         joinType: 'hasMany',
         options,
@@ -139,6 +140,7 @@ export const hasMany = createDecorator(({ decoratorArgs: [options = {}], target,
 export const hasOne = createDecorator(({ decoratorArgs: [options = {}], target, key, fieldValue }) => {
     Object.defineProperty(target, key, createDocumentProperty(key))
     return {
+        isShared: true,
         type: 'relationship',
         joinType: 'hasOne',
         options,
