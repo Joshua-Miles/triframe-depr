@@ -126,20 +126,25 @@ export const virtual = createDecorator(({ decoratorArgs: [definition], target, k
     }
 })
 
-export const hasMany = createDecorator(({ decoratorArgs: [options = {}], fieldValue }) => ({
-    type: 'relationship',
-    joinType: 'hasMany',
-    options,
-    defaultValue: fieldValue
-}))
+export const hasMany = createDecorator(({ decoratorArgs: [options = {}], target, key, fieldValue }) => {
+    Object.defineProperty(target, key, createDocumentProperty(key))
+    return {
+        type: 'relationship',
+        joinType: 'hasMany',
+        options,
+        defaultValue: fieldValue
+    }
+})
 
-
-export const hasOne = createDecorator(({ decoratorArgs: [options = {}], fieldValue }) => ({
-    type: 'relationship',
-    joinType: 'hasOne',
-    options,
-    defaultValue: fieldValue
-}))
+export const hasOne = createDecorator(({ decoratorArgs: [options = {}], target, key, fieldValue }) => {
+    Object.defineProperty(target, key, createDocumentProperty(key))
+    return {
+        type: 'relationship',
+        joinType: 'hasOne',
+        options,
+        defaultValue: fieldValue
+    }
+})
 
 export const belongsTo = createDecorator(({ decoratorArgs: [options = {}], target, key, fieldValue }) => {
     let foreignKey = toCamelCase( toForeignKeyName(key) )
