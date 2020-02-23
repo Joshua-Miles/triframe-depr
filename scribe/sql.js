@@ -233,7 +233,7 @@ function buildJoinClause(className, properties, { label = false, alias = false, 
             ; ({ options, joinType } = metadata[key])
             const relationName = alias || toTableName(currentClassName)
             const nextRelationName = toClassName(options.a || options.an || options.of || key)
-            const myAliasName = options.as || toTableName(currentClassName)
+            const myAliasName = options.as || currentClassName
             switch (joinType) {
                 case 'belongsTo':
                     value[toForeignKeyName(key)] = true
