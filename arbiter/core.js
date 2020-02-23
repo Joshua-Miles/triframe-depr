@@ -6,7 +6,7 @@ export const initializeResource = (resource, attributes) => {
     Object.defineProperty(resource, '[[attributes]]', {
         writable: true,
         enumerable: false,
-        value: {}
+        value: attributes
     })
     Object.defineProperty(resource, '[[base]]', {
         writable: true,
@@ -28,7 +28,6 @@ export const initializeResource = (resource, attributes) => {
         enumerable: false,
         value: 0
     })
-    Object.assign(resource, attributes)
     subscribeToChildEvents(attributes)
 }
 

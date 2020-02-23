@@ -49,7 +49,7 @@ export const sql = async (queryFragments, ...variables) => {
     const promise = settings.db.query(parsed, escaped)
     escaped = []
     let response = await promise
-    return deepMap(response.rows, (value) => {
+    let result = deepMap(response.rows, (value) => {
         if (value && value.__class__) {
             let Model = settings.models[value.__class__]
             let tempInstance = new Model;
@@ -59,15 +59,15 @@ export const sql = async (queryFragments, ...variables) => {
                 if(sqlDecode) return sqlDecode(value)
                 else return value
             }
-            const ish= new Model(index(value, camelCasedKeys, decodedValues))
-console.log(ish)
-            return ish
+            return new Model(index(value, camelCasedKeys, decodedValues))
         }
         if (Array.isArray(value)) {
             return value.filter(value => value.id !== null)
         }
         return value
     })
+console.log(result)
+    return result
 }
 
 let applicationMetadata;
