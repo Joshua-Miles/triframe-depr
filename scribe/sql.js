@@ -66,7 +66,6 @@ export const sql = async (queryFragments, ...variables) => {
         }
         return value
     })
-console.log(result)
     return result
 }
 
