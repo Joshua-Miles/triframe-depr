@@ -10,7 +10,7 @@ module.exports = async function newProject(name) {
     progress.start(100, 25)
     await exec(`npx expo init "${name}" --template bare-minimum`)
     progress.update(50)
-    await exec(`cd "${name}" && npm install webpack webpack-cli concurrently babel-loader babel-plugin-named-asset-import @expo/webpack-config --save-dev && npm install socket.io express formidable && npm link triframe`)
+    await exec(`cd "${name}" && npm install webpack webpack-cli concurrently babel-loader babel-plugin-named-asset-import @expo/webpack-config --save-dev && npm install socket.io express formidable https://github.com/Joshua-Miles/triframe.git`)
     const packagePath = path.join(process.cwd(), name, 'package.json')
     const config = require(packagePath)
     config.scripts = {

@@ -45,6 +45,18 @@ export class List extends Array {
         this.emit('Δ.change', [ patch ])
     }
 
+    
+    replace(index, value){
+        this[index] = value
+        let patch = {
+            op: 'replace',
+            path: `/${index}`,
+            value
+        }
+        this["[[patches]]"].push(patch)
+        this.emit('Δ.change', [ patch ])
+    }
+
 
     remove(index){
         this.splice(index, 1)

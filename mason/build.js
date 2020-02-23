@@ -42,6 +42,7 @@ ${definition}
                 let defaults = ''
                 var [ path, name, ...instructions] = args;
                 var [ Name, Model = name ] = name.split(':')
+                var model = Model.toLowerCase()
                 let fields = instructions.reduce( ( fields, part, index ) => {
                     let [ something, Input = 'TextInput' ] = part.split(':')
                     var [ label, defaultValue = '""' ] = something.split('=')
@@ -51,23 +52,39 @@ ${definition}
                     fields = `${fields}
         <${Input}
             label="${label}"
-            value={form.${name}}
-            onChangeText={${name} => form.set({ ${name} })}
+            value={${model}.${name}}
+            onChangeText={${name} => ${model}.set({ ${name} })}
         />
-        <HelperText visible={!form.isValid('${name}')} type="error">
-            {form.errorsFor('${name}')}
+        <HelperText visible={form.hasBeenSubmitted && ${model}.validation.hasErrors('${name}')} type="error">
+            {${model}.validation.errorsFor('${name}')}
         </HelperText>`
                     return fields
                 }, '')
                 var code= `import React from 'react'
 import { tether, Container, Button, HelperText, ${Object.keys(inputs).join(', ')} } from 'triframe/designer'
-const ${Name} = tether(function*({  models, props, use, useContext, useHistory, redirect  }) {
+const ${Name} = tether(function*({  models, use, redirect, catchErrors, onError }) {
+
     const { ${Model} } = models
-    const form = yield use(new ${Model}({${defaults}
+
+    const ${model} = yield use(new ${Model}({${defaults}
     }))
+    
+    const form = yield use({ hasBeenSubmitted: false, errorMessage: '' })
+
+    const handleSubmit = () => {
+        console.log(${model})
+    }
+
+    onError((err) => {
+        form.set({ errorMessage: err.message })
+    })
+
     return (
-        <Container>${fields}
-            <Button onPress={console.log}>
+        <Container>
+            <HelperText visible={form.errorMessage.length > 0} type="error">
+                {form.errorMessage}
+            </HelperText>${fields}
+            <Button onPress={catchErrors(handleSubmit)}>
                 Submit
             </Button>
         </Container>

@@ -35,8 +35,6 @@ export const MainPage = () => {
     // Modal 
     const [modalIsVisible, showModal] = useState(false)
 
-    // File Input
-    const [ imageURL, setImageURL ] = useState('')
 
     return (
         <Drawer
@@ -77,9 +75,8 @@ export const MainPage = () => {
                     <ToggleSwitch value={toggleIsChecked} onPress={() => checkToggle(!toggleIsChecked)} />
                 </Section>
                 <Section>
-                    <Heading>Image Input</Heading>
-                    <Image source={{ uri: `http://localhost:8080${imageURL}`}} />
-                    <FileInput onChange={setImageURL}>Upload an Image</FileInput>
+                    <Heading>File Input</Heading>
+                    <FileInput onChange={url => console.log('URL to uploaded file: ', url)}>Upload an Image</FileInput>
                 </Section>
                 <Section>
                     <Heading>Section</Heading>

@@ -1,5 +1,5 @@
 import { jsonpatch, JSONPatchOT } from "./jsonpatch"
-import { each } from "../core"
+import { each, toCapitalized } from "../core"
 
 export const initializeResource = (resource, attributes) => {
     // [[base]] + [[patches]] = [[attributes]]
@@ -28,7 +28,9 @@ export const initializeResource = (resource, attributes) => {
         enumerable: false,
         value: 0
     })
-    subscribeToChildEvents(attributes)
+    subscribeToChildEvents(resource, attributes)
+    if(typeof resource.onChange === 'function') 
+        resource.on('Δ.change', (patches) => emitResourceEvent(resource, 'change', patches))
 }
 
 export const stageNewPatches = resource => { // unserializer -> unserialzieRemoteFunction
@@ -45,15 +47,16 @@ export const stageNewPatches = resource => { // unserializer -> unserialzieRemot
 }
 
 
-export const appendPatches = (resource, patches) => { // serializer -> serializeFunction
+export const appendPatches = (resource, patches) => {
     if (!resource || !resource["[[patches]]"]) return []
     jsonpatch.applyPatch(resource['[[attributes]]'], patches)
     resource["[[patches]]"].push(...patches)
     return patches
 }
 
-export const mergePatches = (resource, patches) => { // serializer -> cache, unserializer -> register
+export const mergePatches = (resource, patches) => {
     resource['[[patches]]'] = JSONPatchOT.transform(resource['[[patches]]'], patches)
+    emitResourceEvent(resource, 'merge', patches)
     return commitPatches(resource, patches)
 }
 
@@ -61,7 +64,7 @@ export const createBatch = resource => {
     return resource['[[batch]]']++;
 }
 
-export const commitBatch = (resource, batchId) => { // serializer -> cache, unserializer -> register
+export const commitBatch = (resource, batchId) => {
     let patches = resource['[[patches]]'].filter(patch => patch.batchId === batchId)
     resource['[[patches]]'] = resource['[[patches]]'].filter(patch => patch.batchId !== batchId)
     return commitPatches(resource, patches)
@@ -72,20 +75,29 @@ const commitPatches = (resource, patches) => {
     let attributes = jsonpatch.deepClone(resource['[[base]]'])
     jsonpatch.applyPatch(attributes, resource['[[patches]]'])
     resource['[[attributes]]'] = attributes
-    subscribeToChildEvents(attributes)
+    subscribeToChildEvents(resource, attributes)
     return patches
 }
 
-const subscribeToChildEvents = attributes => {
+const subscribeToChildEvents = (resource, attributes) => {
     each(attributes, (key, value) => {
         if (value && value.on) {
-            value.on('change', patches => {
-                resource["[[patches]]"].push(...patches.map(patch => ({
+            value.on('Δ.change', patches => {
+                const mappedPatches = patches.map(patch => ({
                     op: patch.op,
                     path: `/${key}${patch.path}`,
                     value: patch.value,
-                })))
+                }))
+                resource["[[patches]]"].push(...mappedPatches)
+                resource.emit('Δ.change', mappedPatches)
             })
         }
     })
+}
+
+const emitResourceEvent = (resource, event, payload) => {
+    resource.emit(event, payload)
+    const methodName = `on${toCapitalized(event)}`
+    if(typeof resource[methodName] === 'function') 
+        resource[methodName](payload)
 }
