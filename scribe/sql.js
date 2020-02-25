@@ -126,7 +126,9 @@ function generateSQL(obj, remaining = '') {
     const properties = obj[key]
     const selectClause = buildSelectClause(className, properties) // <-- `properties` WILL be mutated to account for virtual columns
     const fromClause = buildJoinClause(className, properties)
-    return `${selectClause} FROM ${key} ${fromClause} ${remaining} GROUP BY "${key}".id`
+    let [ remaining1, remaining2 = "" ] = remaining.split('ORDER BY')
+    if(remaining2) remaining2 = `ORDER BY ${remaining2}`
+    return `${selectClause} FROM ${key} ${fromClause} ${remaining1} GROUP BY "${key}".id ${remaining2}`
 }
 
 function buildSelectClause(className, properties, { label = false, alias = false, nested = false } = {}) {

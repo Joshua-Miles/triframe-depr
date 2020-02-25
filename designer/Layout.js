@@ -7,7 +7,7 @@ export const Container = ({ children, style, slim }) => (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{
         flexGrow: 1, display: 'flex', paddingBottom: slim ? 0 : 100 , margin: slim ? 0 : 50, ...style, 
     }}>
-        <Portal.Host />
+        <View><Portal.Host /></View>
         {renderChildren(children)}
     </ScrollView>
 )

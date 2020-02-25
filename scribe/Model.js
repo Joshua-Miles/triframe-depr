@@ -40,15 +40,17 @@ class Model {
         return result
     }
 
-    update(attributes = {}){
+    async update(attributes = {}){
         Object.assign(this, attributes)
         const { relation } = this.constructor;
         const fields = this.constructor.fieldsFrom(this)
-        const result =  sql`
+        emitResourceEvent(this, 'commiting', this)
+        const result =  await sql`
             UPDATE ${relation} 
             SET ${pairs(fields).join(', ')}
             WHERE id = ${this.id}
-        `
+        `        
+        emitResourceEvent(this, 'commited', this)
         return result
     }
 
@@ -74,6 +76,7 @@ class Model {
                     ${literal(columns)}
                 }
             }
+            ORDER BY ${relation}.id ASC
         `
     }
 
@@ -94,6 +97,7 @@ class Model {
                 }
             }
             WHERE (${pairs(conditions).join(' AND ')}) 
+            ORDER BY ${relation}.id ASC
         `
     }
 
@@ -113,6 +117,7 @@ class Model {
                 }
             }
             WHERE (${pairs(conditions, 'LIKE').join(' OR ')}) 
+            ORDER BY ${relation}.id ASC
         `
     }
 
@@ -159,5 +164,11 @@ class Model {
 
 }
 
+const emitResourceEvent = (resource, event, payload) => {
+    resource.emit(`Δ.${event}`, payload)
+    const methodName = `on${toCapitalized(event)}`
+    if(typeof resource[methodName] === 'function') 
+        resource[methodName](payload)
+}
 
 export { Model }

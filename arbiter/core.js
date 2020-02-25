@@ -96,7 +96,7 @@ const subscribeToChildEvents = (resource, attributes) => {
 }
 
 const emitResourceEvent = (resource, event, payload) => {
-    resource.emit(event, payload)
+    resource.emit(`Δ.${event}`, payload)
     const methodName = `on${toCapitalized(event)}`
     if(typeof resource[methodName] === 'function') 
         resource[methodName](payload)

@@ -170,17 +170,19 @@ const isPromise = value => value && typeof value.then == 'function' && !isPipe(v
 
 const global = {}
 
-// const clone = 
-
 const createCache = ({ socket }) => {
 
     const bin = {}
 
     function cache(resource) {
+
+        global[resource.uid] = global[resource.uid] || { patches: [], branches: [] }
+
+        mergePatches(resource, global[resource.uid].patches)
+
         if (!bin[resource.uid]) {
-            bin[resource.uid] = resource
-            global[resource.uid] = global[resource.uid] || { base: clone(resource), branches: [] }
-            resource = clone(global[resource.uid].base)
+            bin[resource.uid] = resource            
+        
             global[resource.uid].branches.push({ socket, resource })
 
             socket.on(`${resource.uid}.sync`, ({ batchId, patches }) => {
@@ -195,12 +197,22 @@ const createCache = ({ socket }) => {
                 const batchId = createBatch(resource)
                 sync(batchId, { includeSelf: true })
             })
+
+            let pendingCommits = []
+            resource.on('Δ.commiting', () => {
+                pendingCommits.push([ ...global[resource.uid].patches ])
+            })
+
+            resource.on('Δ.commited', () => {
+                let committedPatches = pendingCommits.shift()
+                global[resource.uid].patches = global[resource.uid].patches.filter( patch => !committedPatches.includes(patch))
+            })
         }
 
 
         const sync = (batchId, { includeSelf = false } = {}) => {
             const patches = commitBatch(resource, batchId)
-            mergePatches(global[resource.uid].base, patches)
+            global[resource.uid].patches.push(...patches)
             global[resource.uid].branches.forEach(({ socket: otherSocket, resource }) => {
                 if (socket != otherSocket || includeSelf) {
                     mergePatches(resource, patches)
@@ -209,7 +221,7 @@ const createCache = ({ socket }) => {
             })
         }
 
-        return global[resource.uid].base
+        return resource
     }
 
     function getCached(uid) {
@@ -241,44 +253,4 @@ const serializeDocument = function (document, connection) {
         _proto_: document.constructor.name
     }
 
-}
-
-const clone = (resource) => {
-    const classes = {}
-
-    const serializeDocument = function (document) {
-        const next = document => serializeDocument(document)
-        if (!document) return document
-        if (isClass(document)) return { _class_: document.name }
-        if (isPrimative(document)) return document
-        if (isArray(document)) return document.map((element, index) => next(element))
-        if (isObject(document)) return map(document, (propertyName, object) => next(object))
-
-        if (isDocument(document)) {
-            classes[document.constructor.name] = document.constructor
-            return {
-                ...map(document['[[attributes]]'], (propertyName, object) => {
-                    const metadata = getMetadata(document, propertyName)
-                    const { accessLevel, authCheck } = metadata;
-                    return next(object)
-                }),
-                _proto_: document.constructor.name
-            }
-        }
-
-    }
-
-    const unserializeDocument = (document) => {
-        const next = document => unserializeDocument(document)
-        if (!document) return document
-        if (primativeTypes.includes(document.constructor.name)) return document
-        if (Array.isArray(document)) return new List(...document.map(document => next(document)))
-        const { _class_, _proto_, ...attributes } = document;
-        if (_class_) return classes[__class__]
-        if (_proto_) return new classes[_proto_](map(attributes, (key, value) => next(value)))
-        return map(attributes, (key, value) => next(value))
-    }
-
-
-    return unserializeDocument(serializeDocument(resource))
 }
