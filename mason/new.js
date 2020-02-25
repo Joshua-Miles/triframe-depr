@@ -24,9 +24,9 @@ module.exports = async function newProject(name) {
     const gitignorePath = path.join(process.cwd(), name, '.gitignore')
     const gitignoreContent = await fs.readFile(gitignorePath)
     await fs.writeFile(gitignorePath, `${gitignoreContent}
-    dist
-    .sessions
-    .uploads`)
+dist
+.sessions
+.uploads`)
 
     progress.update(75)
     await Promise.all(['api.config.js', 'dist', 'tsconfig.json', 'App.js', 'Api.js', 'views', 'models', 'webpack.config.js'].map(async folder => {
