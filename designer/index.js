@@ -4,7 +4,7 @@ import { View, TouchableOpacity, Platform, ScrollView, Animated, PanResponder, M
 require('./platform')
 
 // Native Paper Components
-import { Provider as StyleProvider, Appbar, Avatar, Menu, Divider, Badge, RadioButton, Snackbar, Portal, ProgressBar, Checkbox } from 'react-native-paper';
+import { Provider as StyleProvider, Appbar, Avatar, Menu, Divider, Badge, RadioButton, Snackbar, Portal, ProgressBar, Checkbox, Switch } from 'react-native-paper';
 
 // Custom Components
 import TextEditor from './TextEditor'
@@ -16,9 +16,9 @@ import { Button, BubbleButton, ToggleButton } from './Button'
 import { Text, Title, Heading, Subheading, Paragraph, Caption } from './Typography'
 import { TextInput, PasswordInput, TextField, HelperText, ToggleSwitch, FileInput } from './Form'
 
-import { Route } from 'react-router';
-import { Router } from './Router';
+import { Route, Redirect } from 'react-router';
 import { Provider, tether } from './Provider';
+
 
 
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons'
@@ -33,8 +33,12 @@ const { Grid, Column } = createGrid({
 
 
 
-
 export {
+
+    Switch,
+
+    Redirect,
+
     Provider,
 
     tether,
