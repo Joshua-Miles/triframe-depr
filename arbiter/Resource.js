@@ -40,7 +40,7 @@ function createResourceValidator() {
 
     return {
 
-        for: (document) => ({
+        for: (resource) => ({
 
             handlers: handlers,
 
@@ -60,10 +60,10 @@ function createResourceValidator() {
             errorsFor(propertyName){
                 const validators = handlers[propertyName]
                 if (validators !== undefined) {
-                    const property = document[propertyName]
+                    const property = resource[propertyName]
                     const errors = []
                     const label = toTitleCase(propertyName)
-                    validators.forEach(validator => validator({ property, label, errors, document }))
+                    validators.forEach(validator => validator({ property, label, errors, resource }))
                     return errors
                 } else {
                     return []
