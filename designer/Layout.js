@@ -5,7 +5,7 @@ import { Portal } from 'react-native-paper'
 
 export const Container = ({ children, style, slim }) => (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{
-        flexGrow: 1, display: 'flex', paddingBottom: slim ? 0 : 100 , margin: slim ? 0 : 50, ...style, 
+        flexGrow: 1, display: 'flex', margin: slim ? 0 : 50, ...style, 
     }}>
         <View><Portal.Host /></View>
         {renderChildren(children)}

@@ -21,15 +21,6 @@ fs.readdirSync('node_modules')
   nodeModules['tls'] = 'commonjs ' + 'tls';
   nodeModules['socket.io'] = 'commonjs ' + 'socket.io';
   nodeModules['express'] = 'commonjs ' + 'express';
-
-
-
- 
-
-
-
-
-
   
 module.exports = {
   entry: './Api.js',
@@ -38,13 +29,16 @@ module.exports = {
     path: path.resolve(path.join(__dirname, 'dist')),
     filename: 'index.js'
   },
+  node: {
+    process: false
+  },
   externals: nodeModules,
   module: {
     rules: [
       {
         test: /\.m?js$/,
         exclude: path => {
-          let result = (path.includes('node_modules') || path.includes('bower_components'))
+          let result = (path.includes('node_modules') || path.includes('bower_components')) &&! path.includes('triframe')
           return result
         },
         use: {
