@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { withRouter } from 'react-router'
 import { Pipe, EventEmitter } from '../core';
 import { Router } from './Router'
-import { Provider as PaperProvider, Snackbar, Portal } from 'react-native-paper'
+import { Provider as PaperProvider, Snackbar, Portal, DefaultTheme } from 'react-native-paper'
 import { View } from 'react-native'
 import { createUnserializer } from '../arbiter'
 
@@ -19,7 +19,7 @@ export const Provider = (props) => (
 
 let displayError;
 
-const Main = ({ children, iconSets = ['MaterialIcons'], url = 'http://localhost:8080' }) => {
+const Main = ({ children, iconSets = ['MaterialIcons'], url = 'http://localhost:8080', theme = DefaultTheme }) => {
     let error;
     ([error, displayError] = useState(false))
     let [models, saveModels] = useState({ areReady: false })
@@ -38,7 +38,7 @@ const Main = ({ children, iconSets = ['MaterialIcons'], url = 'http://localhost:
     }, [])
     return (
         <Model.Provider value={models}>
-            <PaperProvider>
+            <PaperProvider theme={theme}>
                 <Portal.Host />
                 <View style={{ height: '100vh' }}>
                     <Snackbar
