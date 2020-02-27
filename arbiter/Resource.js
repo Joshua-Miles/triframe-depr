@@ -70,6 +70,12 @@ function createResourceValidator() {
                 }
             },
 
+            errorMessageFor(propertyName){
+                let errors = this.errorsFor(field)
+                let lastError = errors.pop()
+                return `${toTitleCase(propertyName)} ${errors.join(', ')} and ${lastError}`
+            },
+
             get isInvalid() {
                 let isInvalid = false
                 each(handlers, propertyName => {
