@@ -37,7 +37,6 @@ function createResourceValidator() {
 
     const handlers = {}
 
-
     return {
 
         for: (resource) => ({
@@ -47,6 +46,17 @@ function createResourceValidator() {
             addHandler: (propertyName, validator) => {
                 handlers[propertyName] = handlers[propertyName] || []
                 handlers[propertyName].push(validator)
+            },
+
+
+            flagAllErrors(){
+                this.flagAll = true
+                resource.emit('Δ.change')
+            },
+
+            hasFlaggedErrors(propertyName){
+                if(resource[propertyName] || this.flagAll) return this.hasErrors(propertyName)
+                else return false
             },
 
             hasErrors(propertyName){
