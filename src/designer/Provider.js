@@ -11,9 +11,9 @@ import { createUnserializer } from '../arbiter'
 export const Model = React.createContext({ areReady: false })
 
 export const Provider = (props) => (
-    <Router>
+    //<Router>
          <Main {...props} />
-    </Router>
+    //</Router>
 )
 
 
