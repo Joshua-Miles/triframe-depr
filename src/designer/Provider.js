@@ -38,26 +38,27 @@ const Main = ({ children, url = 'http://localhost:8080', theme = DefaultTheme })
         })()
     }, [])
     return (
-        <Model.Provider value={models}>
-            <PaperProvider theme={theme}>
-                <View><Portal.Host /></View>
-                <View style={{ flex: 1 }}>
-                    <Snackbar
-                        visible={error !== false}
-                        onDismiss={() => displayError(false)}
-                        action={{
-                            label: 'Dismiss',
-                            onPress: () => {
-                                displayError(false)
-                            }
-                        }}
-                    >
-                        {error.message}
-                    </Snackbar>
-                    {children}
-                </View>
-            </PaperProvider>
-        </Model.Provider>
+        <Text>FUCKKKKKKKK</Text>
+        // <Model.Provider value={models}>
+        //     <PaperProvider theme={theme}>
+        //         <View><Portal.Host /></View>
+        //         <View style={{ flex: 1 }}>
+        //             <Snackbar
+        //                 visible={error !== false}
+        //                 onDismiss={() => displayError(false)}
+        //                 action={{
+        //                     label: 'Dismiss',
+        //                     onPress: () => {
+        //                         displayError(false)
+        //                     }
+        //                 }}
+        //             >
+        //                 {error.message}
+        //             </Snackbar>
+        //             {children}
+        //         </View>
+        //     </PaperProvider>
+        // </Model.Provider>
     )
 }
 
