@@ -26,15 +26,15 @@ const Main = ({ children, url = 'http://localhost:8080', theme = DefaultTheme })
     useEffect(() => {
         (async function () {
             await fetch(`${url}/init`, { credentials: 'include' }) // <-- necessary to initialize session. This should be removed in a future release
-            let io = socketIo(url)
-            if(typeof window !== 'undefined') window.io = io
-            const unserialize = createUnserializer(io)
-            io.on('interface', schema => {
-                console.log(schema)
-                const api = unserialize(schema)
-                saveModels({ ...api, url })
-                if (typeof window !== 'undefined') Object.assign(window, api)
-            })
+            // let io = socketIo(url)
+            // if(typeof window !== 'undefined') window.io = io
+            // const unserialize = createUnserializer(io)
+            // io.on('interface', schema => {
+            //     console.log(schema)
+            //     const api = unserialize(schema)
+            //     saveModels({ ...api, url })
+            //     if (typeof window !== 'undefined') Object.assign(window, api)
+            // })
         })()
     }, [])
     return (
