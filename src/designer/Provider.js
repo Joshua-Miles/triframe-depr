@@ -137,6 +137,5 @@ let ConnectedComponent = withRouter(({ props = [], models, Component, history, m
     useEffect(() => {
         if (typeof data.runAfterRender == 'function') data.runAfterRender()
     })
-    console.log('and here', data.jsx)
     return data.jsx
 })
