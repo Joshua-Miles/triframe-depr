@@ -1,6 +1,6 @@
 const path = require('path');
 const nodeExternals = require('webpack-node-externals');
-const externals = [{'fs': 'commonjs fs', 'child_process': 'commonjs child_process', 'http': 'commonjs http', 'triframe/core': 'commonjs triframe/core'}, nodeExternals()]
+const externals = [{ 'fs': 'commonjs fs', 'child_process': 'commonjs child_process', 'http': 'commonjs http', 'triframe/core': 'commonjs triframe/core' }, nodeExternals()]
 
 const moduleConfig = {
     rules: [
@@ -28,58 +28,6 @@ const moduleConfig = {
     ]
 }
 
-const scribeConfig = {
-    entry: './src/scribe/index.js',
-    output: {
-        libraryTarget: 'commonjs2',
-        path: path.resolve(__dirname),
-        filename: 'scribe.js',
-    },
-    externals,
-    module: moduleConfig
-};
-
-const scribeWebConfig = {
-    resolve: {
-        extensions: ['.client.js', '.js'],
-    },
-    entry: './src/scribe/index.js',
-    output: {
-        libraryTarget: 'commonjs2',
-        path: path.resolve(__dirname),
-        filename: 'scribe.web.js',
-    },
-    externals,
-    module: moduleConfig
-};
-
-const scribeIosConfig = {
-    resolve: {
-        extensions: ['.client.js', '.js'],
-    },
-    entry: './src/scribe/index.js',
-    output: {
-        libraryTarget: 'commonjs2',
-        path: path.resolve(__dirname),
-        filename: 'scribe.ios.js',
-    },
-    externals,
-    module: moduleConfig
-};
-
-const scribeAndroidConfig = {
-    resolve: {
-        extensions: ['.client.js', '.js'],
-    },
-    entry: './src/scribe/index.js',
-    output: {
-        libraryTarget: 'commonjs2',
-        path: path.resolve(__dirname),
-        filename: 'scribe.android.js',
-    },
-    externals,
-    module: moduleConfig
-};
 
 const coreConfig = {
     entry: './src/core/index.js',
@@ -87,6 +35,17 @@ const coreConfig = {
         libraryTarget: 'commonjs2',
         path: path.resolve(__dirname),
         filename: 'core.js',
+    },
+    externals,
+    module: moduleConfig
+};
+
+const scribeConfig = {
+    entry: './src/scribe/index.js',
+    output: {
+        libraryTarget: 'commonjs2',
+        path: path.resolve(__dirname),
+        filename: 'scribe.js',
     },
     externals,
     module: moduleConfig
@@ -114,6 +73,48 @@ const arbiterConfig = {
     module: moduleConfig
 };
 
+const arbiterWebConfig = {
+    entry: './src/arbiter/index.js',
+    resolve: {
+        extensions: ['.web.js', '.client.js', '.js'],
+    },
+    output: {
+        libraryTarget: 'commonjs2',
+        path: path.resolve(__dirname),
+        filename: 'arbiter.web.js',
+    },
+    externals,
+    module: moduleConfig
+};
+
+const arbiterAndroidConfig = {
+    entry: './src/arbiter/index.js',
+    resolve: {
+        extensions: ['.android.js', '.client.js', '.js'],
+    },
+    output: {
+        libraryTarget: 'commonjs2',
+        path: path.resolve(__dirname),
+        filename: 'arbiter.android.js',
+    },
+    externals,
+    module: moduleConfig
+};
+
+const arbiterIosConfig = {
+    entry: './src/arbiter/index.js',
+    resolve: {
+        extensions: ['.ios.js', '.client.js', '.js'],
+    },
+    output: {
+        libraryTarget: 'commonjs2',
+        path: path.resolve(__dirname),
+        filename: 'arbiter.ios.js',
+    },
+    externals,
+    module: moduleConfig
+};
+
 const designerWebConfig = {
     entry: './src/designer/index.js',
     resolve: {
@@ -125,8 +126,8 @@ const designerWebConfig = {
         filename: 'designer.web.js',
     },
     externals: [...externals, {
-        'react': 'commonjs react', 
-        'react-native': 'commonjs react-native', 
+        'react': 'commonjs react',
+        'react-native': 'commonjs react-native',
         '@expo/vector-icons': 'commonjs @expo/vector-icons'
     }],
     module: {
@@ -153,7 +154,7 @@ const designerWebConfig = {
                 }
             }
         ]
-    } 
+    }
 };
 
 const designerIosConfig = {
@@ -167,8 +168,8 @@ const designerIosConfig = {
         filename: 'designer.ios.js',
     },
     externals: [...externals, {
-        'react': 'react', 
-        'react-native': 'react-native', 
+        'react': 'react',
+        'react-native': 'react-native',
         '@expo/vector-icons': '@expo/vector-icons'
     }],
     module: {
@@ -195,7 +196,7 @@ const designerIosConfig = {
                 }
             }
         ]
-    } 
+    }
 };
 
 const designerAndroidConfig = {
@@ -209,8 +210,8 @@ const designerAndroidConfig = {
         filename: 'designer.android.js',
     },
     externals: [...externals, {
-        'react': 'react', 
-        'react-native': 'react-native', 
+        'react': 'react',
+        'react-native': 'react-native',
         '@expo/vector-icons': '@expo/vector-icons'
     }],
     module: {
@@ -237,7 +238,7 @@ const designerAndroidConfig = {
                 }
             }
         ]
-    } 
+    }
 };
 
-module.exports = [coreConfig, scribeWebConfig, scribeIosConfig, scribeAndroidConfig, scribeConfig, masonConfig, arbiterConfig, designerWebConfig, designerIosConfig, designerAndroidConfig ] 
+module.exports = [coreConfig, scribeConfig, masonConfig, arbiterConfig, arbiterWebConfig, arbiterAndroidConfig, arbiterIosConfig, designerWebConfig, designerIosConfig, designerAndroidConfig] 
