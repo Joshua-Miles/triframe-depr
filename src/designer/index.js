@@ -19,7 +19,7 @@ import { Provider, tether } from './Provider';
 
 
 
-import { MaterialIcons as Icon } from '@expo/vector-icons';
+// import { MaterialIcons as Icon } from '@expo/vector-icons';
 
 const { Grid, Column } = createGrid({
     xs: 0,
@@ -51,7 +51,7 @@ export {
 
     Portal,
 
-    Icon,
+    // Icon,
 
     TouchableOpacity, ScrollView, Animated, PanResponder, LegacyModal,
 
