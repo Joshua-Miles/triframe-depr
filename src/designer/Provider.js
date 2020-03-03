@@ -92,8 +92,6 @@ let ConnectedComponent = withRouter(({ props = [], models, Component, history, m
     const propsArray = Object.values(props)
     const getHistory = () => ({ history, match, location })
 
-    console.log(models)
-
     useEffect(() => {
         let pipe;
         if (models.areReady === false) return
