@@ -1,10 +1,13 @@
 // Native and Platform Components
 import { View, TouchableOpacity, Platform, ScrollView, Animated, PanResponder, Modal as LegacyModal } from 'react-native'
 
-// Native Paper Components
+
+// // Native Paper Components
 import { Provider as StyleProvider, Appbar, Avatar, Menu, Divider, Badge, RadioButton, Snackbar, Portal, ProgressBar, Checkbox, Switch } from 'react-native-paper';
 
-// Custom Components
+
+
+// // Custom Components
 import TextEditor from './TextEditor'
 import Drawer from './Drawer'
 import Modal from './Modal'
@@ -19,7 +22,7 @@ import { Provider, tether } from './Provider';
 
 
 
-// import { MaterialIcons as Icon } from '@expo/vector-icons';
+// // import { MaterialIcons as Icon } from '@expo/vector-icons';
 
 const { Grid, Column } = createGrid({
     xs: 0,

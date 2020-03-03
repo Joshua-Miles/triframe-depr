@@ -3,9 +3,7 @@ import { Button as Pressable, FAB, ToggleButton } from 'react-native-paper'
 import { View } from 'react-native'
 
 const Button = ({ children, mode = "contained", ...rest }) => (
-    <View style={{ flexDirection: 'row' }}>
-        <Pressable style={{ padding: 5, margin: 5 }} mode={mode} {...rest}>{children}</Pressable>
-    </View>
+    <Pressable style={{ padding: 5, margin: 5 }} mode={mode} {...rest}>{children}</Pressable>
 )
 
 const BubbleButton = (props) => (

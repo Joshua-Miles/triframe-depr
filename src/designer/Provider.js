@@ -4,7 +4,7 @@ import { withRouter } from 'react-router'
 import { Pipe, EventEmitter, each } from '../core';
 import { Router } from './Router'
 import { Provider as PaperProvider, Snackbar, Portal, DefaultTheme } from 'react-native-paper'
-import { View } from 'react-native'
+import { View, Text} from 'react-native'
 import { createUnserializer } from '../arbiter'
 
 
@@ -12,7 +12,7 @@ export const Model = React.createContext({ areReady: false })
 
 export const Provider = (props) => (
     <Router>
-        <Main {...props} />
+         <Main {...props} />
     </Router>
 )
 
@@ -40,8 +40,8 @@ const Main = ({ children, url = 'http://localhost:8080', theme = DefaultTheme })
     return (
         <Model.Provider value={models}>
             <PaperProvider theme={theme}>
-                <Portal.Host />
-                <View style={{ height: '100vh' }}>
+                <View><Portal.Host /></View>
+                <View style={{ flex: 1 }}>
                     <Snackbar
                         visible={error !== false}
                         onDismiss={() => displayError(false)}
@@ -92,6 +92,8 @@ let ConnectedComponent = withRouter(({ props = [], models, Component, history, m
     const propsArray = Object.values(props)
     const getHistory = () => ({ history, match, location })
 
+    console.log(models)
+
     useEffect(() => {
         let pipe;
         if (models.areReady === false) return
@@ -135,5 +137,6 @@ let ConnectedComponent = withRouter(({ props = [], models, Component, history, m
     useEffect(() => {
         if (typeof data.runAfterRender == 'function') data.runAfterRender()
     })
+    console.log('and here', data.jsx)
     return data.jsx
 })
