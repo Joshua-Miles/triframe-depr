@@ -118,7 +118,7 @@ const arbiterIosConfig = {
 const designerWebConfig = {
     entry: './src/designer/index.js',
     resolve: {
-        extensions: ['.web.js', '.js'],
+        extensions: ['.web.js', '.client.js', '.js'],
     },
     output: {
         libraryTarget: 'commonjs2',
@@ -160,7 +160,7 @@ const designerWebConfig = {
 const designerIosConfig = {
     entry: './src/designer/index.js',
     resolve: {
-        extensions: ['.ios.js', '.native.js', '.js'],
+        extensions: ['.ios.js', '.native.js', '.client.js', '.js'],
     },
     output: {
         libraryTarget: 'commonjs2',
@@ -202,7 +202,7 @@ const designerIosConfig = {
 const designerAndroidConfig = {
     entry: './src/designer/index.js',
     resolve: {
-        extensions: ['.android.js', '.native.js', '.js'],
+        extensions: ['.android.js', '.native.js', '.client.js', '.js'],
     },
     output: {
         libraryTarget: 'commonjs2',
