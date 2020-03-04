@@ -15,7 +15,7 @@ module.exports = async function newProject(name) {
     const config = require(packagePath)
     config.scripts = {
         "dev-api": "concurrently \"npx webpack --watch --config api.config.js\"  \"nodemon ./dist/index.js --watch ./dist/index.js\"",
-        "dev-web": "expo start --web",
+        "dev-app": "expo start --web",
         "dev-android": "react-native run-android",
         "dev-ios": "react-native run-ios"
     }

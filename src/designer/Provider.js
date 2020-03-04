@@ -19,7 +19,7 @@ export const Provider = (props) => (
 
 let displayError;
 
-const Main = ({ children, url = 'http://localhost:8080', theme = DefaultTheme }) => {
+const Main = ({ children, url = api, theme = DefaultTheme }) => {
     let error;
     ([error, displayError] = useState(false))
     let [models, saveModels] = useState({ areReady: false })
