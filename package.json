@@ -38,12 +38,5 @@
     "webpack": "^4.42.0",
     "webpack-cli": "^3.3.11",
     "webpack-node-externals": "^1.7.2"
-  },
-  "files": [
-    "./arbiter/*",
-    "./core/*",
-    "./designer/*",
-    "./mason/*",
-    "./scribe/*"
-  ]
+  }
 }
