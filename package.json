@@ -40,10 +40,10 @@
     "webpack-node-externals": "^1.7.2"
   },
   "files": [
-    "./arbiter",
-    "./core",
-    "./designer",
-    "./mason",
-    "./scribe"
+    "./arbiter/*",
+    "./core/*",
+    "./designer/*",
+    "./mason/*",
+    "./scribe/*"
   ]
 }
