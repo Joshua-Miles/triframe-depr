@@ -6,5 +6,6 @@ export let database = null;
 
 export const connect = async options => {
     database = new Client(options);
+    await database.connect()
     await migrate()
 }
