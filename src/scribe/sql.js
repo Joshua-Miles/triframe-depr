@@ -36,7 +36,7 @@ let applicationMetadata, models;
 
 
 export const sql = async (queryFragments, ...variables) => {
-    if(!models) models = index(metadata, ({ className }) => className, ({ Class }) => Class)
+    if(!models) models = index(metadata, (_, { className }) => className, (_, { Class }) => Class)
     const query = queryFragments.reduce((query, fragment, index) => (
         index === 0
             ? `${fragment}`
