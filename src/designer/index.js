@@ -11,12 +11,12 @@ import { Provider as StyleProvider, Appbar, Avatar, Menu, Divider, Badge, RadioB
 import TextEditor from './TextEditor'
 import Drawer from './Drawer'
 import Modal from './Modal'
-import { Card, Chip, List } from './Material'
+import { Card, Chip, List, Surface } from './Material'
 import { createGrid, Container, Section, Area } from './Layout'
 import { Button, BubbleButton, ToggleButton } from './Button'
 import { Text, Title, Heading, Subheading, Paragraph, Caption } from './Typography'
 import { TextInput, PasswordInput, TextField, HelperText, ToggleSwitch, FileInput } from './Form'
-
+import * as Constants from './constants'
 import { Route, Redirect } from 'react-router';
 import { Provider, tether } from './Provider';
 
@@ -35,6 +35,9 @@ const { Grid, Column } = createGrid({
 
 
 export {
+    Surface,
+
+    Constants,
 
     Switch,
 

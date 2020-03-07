@@ -6,7 +6,7 @@ import { Router } from './Router'
 import { Provider as PaperProvider, Snackbar, Portal, DefaultTheme } from 'react-native-paper'
 import { View, Text} from 'react-native'
 import { createUnserializer } from '../arbiter'
-
+import { apiUrl } from './constants'
 
 export const Model = React.createContext({ areReady: false })
 
@@ -19,7 +19,7 @@ export const Provider = (props) => (
 
 let displayError;
 
-const Main = ({ children, url = api, theme = DefaultTheme }) => {
+const Main = ({ children, url = apiUrl, theme = DefaultTheme }) => {
     let error;
     ([error, displayError] = useState(false))
     let [models, saveModels] = useState({ areReady: false })
@@ -30,7 +30,6 @@ const Main = ({ children, url = api, theme = DefaultTheme }) => {
             if(typeof window !== 'undefined') window.io = io
             const unserialize = createUnserializer(io)
             io.on('interface', schema => {
-                console.log(schema)
                 const api = unserialize(schema)
                 saveModels({ ...api, url })
                 if (typeof window !== 'undefined') Object.assign(window, api)

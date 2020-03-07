@@ -1,2 +1,2 @@
 #!/usr/bin/env node
-require('./mason')
+require('./src/mason')

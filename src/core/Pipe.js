@@ -1,4 +1,5 @@
 import { each } from "./iterators"
+import { EventEmitter } from './EventEmitter'
 
 const execute = Symbol()
 const pending = Symbol()
@@ -209,8 +210,8 @@ export class Pipe {
         }
     }
 
-    cacheResource(resource = {}, index){
-        if(!resource) return
+    cacheResource(resource, index){
+        if(!resource) return resource
         let id;
         if(resource.uid) {
             id = resource.uid
