@@ -1,6 +1,8 @@
 /*! fast-json-patch, version: 2.1.0 */
 
 import { List } from "./List";
+import { Resource } from "./Resource";
+import { map } from 'triframe/core'
 
 export const jsonpatch =
 /******/ (function(modules) { // webpackBootstrap
@@ -121,19 +123,68 @@ exports._objectKeys = _objectKeys;
 function _deepClone(obj) {
     switch (typeof obj) {
         case "object":
-            return JSON.parse(JSON.stringify(obj), (key, value) => {
-                if(Array.isArray(value)){
-                    return new List(...value)
-                } else {
-                    return value
-                }
-            }); //Faster than ES5 clone - http://jsperf.com/deep-cloning-of-objects/5
+            if(!obj) return obj
+
+            if(obj['[[attributes]]']){
+                return obj
+                // let Class = obj.constructor
+                // let attributes = _deepClone(obj['[[attributes]]'])
+                // return new Class(attributes)
+            }
+
+            if(Array.isArray(obj)){
+                return obj.map(_deepClone)
+            }
+
+            return map(obj, (k, value) => _deepClone(value))
         case "undefined":
             return null; //this is how JSON.stringify behaves for array items
         default:
             return obj; //no need to clone primitives
     }
 }
+
+
+function deepMerge(obj1, obj2) {
+    switch (typeof obj2) {
+        case "object":
+            if(!obj1) return obj1 || obj2
+
+            if(obj1['[[attributes]]']){
+                obj1['attributes'] = deepMerge(obj1['[[attributes]]'], obj2['[[attributes]]'])
+                obj1['base'] = deepMerge(obj1['[[base]]'], obj2['[[base]]'])
+                return obj1
+            }
+
+            if(Array.isArray(obj2)){
+                return obj2.map( (obj2, i) => obj1[i] && obj1[i].uid == obj2.uid ? deepMerge( obj1[i], obj2) : obj2)
+            }
+
+            return { ...obj1, ...map(obj2, (k, obj2) => deepMerge(obj1[k], obj2)) }
+        case "undefined":
+            return null; //this is how JSON.stringify behaves for array items
+        default:
+            return obj2; //no need to clone primitives
+    }
+}
+
+// function _deepClone(obj) {
+//     switch (typeof obj) {
+//         case "object":
+//             return JSON.parse(JSON.stringify(obj), (key, value) => {
+//                 if(Array.isArray(value)){
+//                     return new List(...value)
+//                 } else {
+//                     return value
+//                 }
+//             }); //Faster than ES5 clone - http://jsperf.com/deep-cloning-of-objects/5
+//         case "undefined":
+//             return null; //this is how JSON.stringify behaves for array items
+//         default:
+//             return obj; //no need to clone primitives
+//     }
+// }
+exports.deepMerge = deepMerge
 exports._deepClone = _deepClone;
 //3x faster than cached /^\d+$/.test(str)
 function isInteger(str) {
@@ -265,6 +316,7 @@ var areEquals = function (a, b) {
 var helpers_1 = __webpack_require__(0);
 exports.JsonPatchError = helpers_1.PatchError;
 exports.deepClone = helpers_1._deepClone;
+exports.deepMerge = helpers_1.deepMerge;
 /* We use a Javascript hash to store each
  function. Each hash entry (property) uses
  the operation identifiers specified in rfc6902.
@@ -668,6 +720,7 @@ exports.validator = core_2.validator;
 var helpers_2 = __webpack_require__(0);
 exports.JsonPatchError = helpers_2.PatchError;
 exports.deepClone = helpers_2._deepClone;
+exports.deepMerge = helpers_2.deepMerge;
 exports.escapePathComponent = helpers_2.escapePathComponent;
 exports.unescapePathComponent = helpers_2.unescapePathComponent;
 var beforeDict = new WeakMap();

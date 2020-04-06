@@ -1,8 +1,9 @@
 import { createSerializer } from '.'
+import { createSession } from './createSession'
 import { EventEmitter } from 'triframe/core'
-// import { migrate } from "../scribe/migrate";
 import fs from 'fs'
 import mime from 'mime';
+
 const app = require('express')();
 const server = require('http').Server(app);
 const io = require('socket.io')(server, { serveClient: false });
@@ -57,13 +58,18 @@ const sessionMiddleware = session({
     saveUninitialized: true
 })
 
-export async function serve(models, options) {
+export function serve(options) {
+
+    let { models, session } = options
+
     models = typeof models == 'function' ? loadModels(models) : models
+
+    const Session = createSession(session)
+
     const router = new EventEmitter
     const serialize = createSerializer(router)
     const apiSchema = serialize(models)
 
-    
     app.use(sessionMiddleware);
     app.use(bodyParserMiddleware)
     app.use(corsMiddleware)
@@ -75,7 +81,7 @@ export async function serve(models, options) {
 
 
     io.on('connection', socket => {
-        const { session } = socket.request;
+        const session = new Session(socket.request.session)
         let requestId = 0;
         const connection = { socket, session }
         socket.use(([event, payload, respond], next) => {
@@ -87,6 +93,7 @@ export async function serve(models, options) {
                     hasResponded = true
                     if (keepOpen) {
                         hook = `${requestId++}: ${event}`
+                        socket.on(`${hook}.destroy`, () => closeHandler())
                         respond({ value, hook })
                     } else {
                         respond({ value })
@@ -110,16 +117,14 @@ const cdnUploadHandler = (req, res) => {
     const form = new formidable.IncomingForm();
     const urls = []
     form.parse(req, (err, fields, files) => {
-        let form = { ...fields, ...files }
-        for (let index = 0; index < form.length; index++) {
-            const file = form[index]
+        Object.values(files).forEach(file => {
             const extension = file.name.split('.').pop()
             const filepath = `${createToken()}.${extension}`
             urls.push(`/cdn/${filepath}`)
             fs.rename(file.path, `${UPLOADS_PATH}/${filepath}`, function (err) {
                 if (err) throw err;
             });
-        }
+        })
         // res.writeHead(200, { 'content-type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
         res.end(JSON.stringify(urls));
     });
@@ -129,7 +134,7 @@ const cdnHandler = (req, res) => {
     const path = req.url.replace('/cdn', `${UPLOADS_PATH}/`)
     const extension = path.split('.').pop()
     const stat = fs.statSync(path);
-    const mimeType = mime.lookup(extension);
+    const mimeType = mime.getType(extension);
     res.writeHead(200, {
         'Content-Type': mimeType,
         'Content-Length': stat.size

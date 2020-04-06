@@ -7,6 +7,7 @@ const pending = Symbol()
 
 export class Pipe {
 
+    latency = false
     listeners = []
     observers = []
     dependencies = []
@@ -70,7 +71,8 @@ export class Pipe {
     }
 
     onCancel(callback) {
-        this.cancelationHandlers.push(callback)
+        if(this.isCanceled) callback()
+        else this.cancelationHandlers.push(callback)
     }
 
     apply(callback, errorHandler = () => void (0)) {
@@ -100,6 +102,10 @@ export class Pipe {
         this.errorHandlers.forEach(handler => handler(err))
     }
 
+    forceReload(){
+        this[execute]()
+    }
+
     [execute] = async () => {
         let cursor;
         let aborted = false
@@ -120,6 +126,7 @@ export class Pipe {
 
         emit.throw = this.throwError
         emit.pipe = this
+    
 
         try {
             cursor = this.process.call(this.thisArg, emit, ...this.args)
@@ -128,12 +135,11 @@ export class Pipe {
         }
 
         const process = ({ value, done }) => {
-            index++
+          
             const { isPipe, isPromise, isObservable } = this.constructor
             const { cached, cache } = this
             const cachedPromise = cached(value)
-            const cachedResource = this.getCachedResource(value, index)
-
+        
             const throwError = err => {
                 if (cursor.throw) {
                     return process(cursor.throw(err))
@@ -149,8 +155,7 @@ export class Pipe {
             return new Promise(async () => {
                 if (cachedPromise) cachedPromise.currentValue instanceof Error
                     ? throwError(cachedPromise.currentValue)
-                    : await next(cachedPromise.currentValue);
-                else if(cachedResource) await next(cachedResource)
+                    : await next(await cachedPromise);
                 else if (isPipe(value)) {
                     this.dependencies.push(value)
                     value.apply(result => {
@@ -165,10 +170,15 @@ export class Pipe {
                     await value
                         .then(next)
                         .catch(err => throwError(err))
-                }
-                else {
-                    if(!done) this.cacheResource(value, index)
-                    await next(value)
+                } else {
+                    index++
+                    const cachedResource = this.getCachedResource(value, index)
+                    if(cachedResource) {
+                        await next(cachedResource)
+                    } else {
+                        if(!done) this.cacheResource(value, index)
+                        await next(value)
+                    }
                 }
             })
         }
@@ -188,7 +198,13 @@ export class Pipe {
 
     cache = pipe => {
         let observer = (err) => {
-            if ((this.observers.length || this.listeners.length) && !this.isCanceled) this[execute]()
+            if ((this.observers.length || this.listeners.length) && !this.isCanceled) {
+                if(this.latency === false) this[execute]()
+                else if(!this.timer) this.timer = setTimeout(() => {
+                    this[execute]()
+                    this.timer = false
+                }, this.latency)
+            }
         }
         pipe.catch(observer)
         pipe.observe(observer)
@@ -216,14 +232,9 @@ export class Pipe {
         if(resource.uid) {
             id = resource.uid
         } else {
-            let hash = JSON.stringify(resource)
-            id = `${hash}.${index}`
-            if(this.currentValue != pending){
-                each(this.resources, key => {
-                    let [cachedHash] = key.split('.')
-                    if(cachedHash === hash) 
-                         throw Error('A new resource was conditionally yielded identical to a prior resource. This behavior is not supported, as TriFrame will not know where to properly yield state. Please give your resources unique `uid` properties')
-                })
+            id = `${index}`
+            if(this.currentValue != pending && this.resources[id] === undefined){
+                throw Error('A new resource without a uid was conditionally yielded. This behavior is not supported, as TriFrame will not know where to properly yield state. Please give your resources unique `uid` properties')
             }
         }
         
@@ -233,6 +244,7 @@ export class Pipe {
             if(typeof node.on === 'function') node.on('Δ.change', () => agent.emit(`change`) )
             else each(node, (key, value) => {
                 Object.defineProperty(node, key, {
+                        enumerable: true,
                         get: () => value,
                         set: newValue => {
                             value = newValue
@@ -247,7 +259,7 @@ export class Pipe {
 
     getCachedResource = (resource = {}, index) => {
         if(!resource) return
-        let id = resource.uid || `${JSON.stringify(resource)}.${index}`
+        let id = resource.uid || `${index}`
         return this.resources[id]
     }
 
@@ -256,6 +268,15 @@ export class Pipe {
     static isPipe = value => value && typeof value.observe == 'function'
 
     static isPromise = value => value && typeof value.then == 'function'
+
+    debounce(latency = 0){
+        this.latency = latency
+        return this
+    }
+
+    toJSON(){
+        return {}
+    }
 
 } 
 

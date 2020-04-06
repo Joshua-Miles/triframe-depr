@@ -45,30 +45,33 @@ const toTitleCase = function (str) {
 module.exports = function([ type, ...args]) {
     switch(type){
         case 'model':
-            let decorators = { _public: true }
+            let decorators = {}
             var [ path, name, ...instructions] = args;
             let definition = instructions.reduce( ( definition, part, index ) => {
                 if(part.includes('=')){
                     let [ name, defaults = "" ] = part.split('=')
-                    try {
-                        JSON.parse(defaults)
-                    } catch {
-                        defaults = `"${defaults}"`
-                    }
+                    // defaults = defaults.replace('_', ' ')
+                    // try {
+                    //     JSON.parse(defaults)
+                    // } catch {
+                    //     defaults = `"${defaults}"`
+                    // }
                     definition =  `${definition}\n  ${name} = ${defaults}\n`
                 } else {
                     let decorator = part
-                    decorators[decorator] = true;
+                    decorators[decorator.split('(')] = true;
                     definition = ` ${definition}\n  @${decorator}`
                 }
                 return definition
             }, '')
-            var code= `import { Model, ${Object.keys(decorators).join(', ') } from 'triframe/scribe'
-export class ${name} extends Model {
+            var code= `import { Resource } from 'triframe/arbiter'
+import { Model, include, ${Object.keys(decorators).join(', ') } } from 'triframe/scribe'
+export class ${name} extends Resource {
+  @include(Model)
 ${definition}
 }`
         
-            fs.writeFile(`./src/${path}.js`, code)
+            fs.writeFile(`./${path}.js`, code)
         break;
         case 'form':
                 let inputs = {}
@@ -97,7 +100,7 @@ ${definition}
             <${Input}
                 label="${label}"
                 value={${model}.${name}}
-                onChangeText={${name} => {
+                onChange={${name} => {
                     hideErrorsFor('${name}')
                     ${model}.${name} = ${name} 
                 }}
@@ -161,7 +164,7 @@ return (
 })
 export { ${Name} }`
             
-                fs.writeFile(`./src/${path}.js`, code)
+                fs.writeFile(`./${path}.js`, code)
             break;
     }
 }

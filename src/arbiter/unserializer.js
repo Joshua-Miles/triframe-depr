@@ -1,7 +1,7 @@
 import { each, map, Pipe } from "triframe/core"
 import { List } from "./List"
 import { Resource } from "./Resource"
-import { stageNewPatches, createBatch, commitBatch, mergePatches } from "./core"
+import { stageNewPatches, createBatch, mergeBatch, mergePatches, rollbackPatches, upstreamMerge } from "./core"
 
 
 const primativeTypes = ['String', 'Boolean', 'Number', 'Date', 'Function']
@@ -14,7 +14,7 @@ export const createUnserializer = io => {
 
     const unserialize = (schema) => {
         if (typeof schema !== 'object') throw Error('schema must be a plain JavaScript Object')
-        return unserializeObject(classes, schema)
+        return unserializeObject(classes, schema.attributes)
     }
 
     const unserializeClass = (schema) => {
@@ -33,7 +33,7 @@ export const createUnserializer = io => {
                     target[key] = unserializeClass(schema)
                 break;
                 case 'object':
-                    target[key] = unserializeObject({}, schema)
+                    target[key] = unserializeObject({}, schema.attributes)
                 break;
                 case 'shared-function':
                     target[key] = unserializeSharedFunction(schema)
@@ -64,7 +64,20 @@ export const createUnserializer = io => {
     }
 
     const unserializeSharedFunction = (schema) => {
-        return new Function(`return ${schema.value}`)()
+        const { isStream, prependEmit, value } = schema
+        const func = new Function(`return ${value}`)()
+        return !isStream
+            ? func
+            : createStream(func, prependEmit)
+    }
+
+    function createStream(method){
+        const process = function(emit, ...args){
+            return method.call(this, ...args, emit)
+        }
+        return function(...args){
+            return new Pipe([this, process], ...args)
+        }
     }
 
     const unserializeRemoteFunction = (schema) => {
@@ -72,24 +85,50 @@ export const createUnserializer = io => {
 
         const remoteProcess = function (emit, args) {
             const { uid } = this;
-            const patches = this.getNewPatches ? this.getNewPatches() : []
-            const emitUnserialized = value => {
-                if(value && value.error) emit.throw(new Error(value.message))
-                let document = unserializeDocument(value, () => emit(document))
+            const patches = stageNewPatches(this)
+            let document;
+            let emitDocument = () => emit(document)
+
+            const emitUnserialized = ({value}) => {
+                if(value && value.error){                    
+                    // TO DO: Remove invalid patches from the resources patches
+                    value.invalidPatches
+
+                    emit.throw(new Error(value.message))
+                }
+                document = unserializeDocument(value, emitDocument)
                 emit(document)
             }
-            io.emit(name, { uid, patches, args }, ({ value, hook }) => {
-                emitUnserialized(value)
-                if(hook !== undefined){
-                    io.on(hook, ({ value }) => emitUnserialized(value))
-                    io.on('reconnect', () => {
-                        io.emit(name, { uid, patches, args }, ({ value, hook }) => {
-                            emitUnserialized(value)
-                            if(hook !== undefined) io.on(hook, ({ value }) => emitUnserialized(value))
-                        })
-                    })
-                }
-            })
+
+            const sendRequest = () => {
+                io.emit(name, { uid, patches, args }, ({ value, hook }) => {
+                    emitUnserialized({value})
+                    if(hook !== undefined) createSubscription(hook)
+                })
+            }
+
+            const createSubscription = (hook) => {
+                io.on(hook, emitUnserialized)
+
+                // If the server or connection fuck up, 
+                //  1. stop listening for the old event, and
+                //  2. re-send the request to re-establish connection
+                // TODO: Worry about a server re-start causing a ton of requests, crashing
+                //  browsers and/or the server
+                io.on('reconnect', () => {
+                    io.removeEventListener(hook, emitUnserialized)
+                    sendRequest()
+                })
+
+                // If this pipe is destroyed (user goes to another page, etc.), 
+                // tell the server to cancel the subscription and stop listening for it
+                emit.pipe.onCancel( () => {
+                    io.removeEventListener(hook, emitUnserialized)
+                    io.emit(`${hook}.destroy`)
+                })
+            }
+            
+            sendRequest()
         }
 
         return function (...args) {
@@ -105,6 +144,7 @@ export const createUnserializer = io => {
             })
         }
         Object.defineProperty(target, key, {
+            enumerable: schema.enumerable,
             get: unserializeFunction(schema.get),
             set: unserializeFunction(schema.set)
         })
@@ -126,7 +166,7 @@ export const createUnserializer = io => {
         if(primativeTypes.includes(document.constructor.name)) return document
         if(Array.isArray(document)) return new List(...document.map( document => next(document)))
         const { _class_, _proto_, ...attributes } = document;
-        if(_class_) return classes[__class__]
+        if(_class_) return classes[_class_]
         if(_proto_) return cache.register(new classes[_proto_](map(attributes, ( key, value ) => next(value))), callback)
         return map(attributes, ( key, value ) => next(value))
     }
@@ -137,31 +177,46 @@ export const createUnserializer = io => {
 
 const createCache = ({ socket }) => {
 
+    let bin = {}
+    window.bin = bin
+
     function register(resource = {}, callback){
+        if(!bin[resource.uid]){
 
-        let timer;
+            function emit(){
+                bin[resource.uid].callbacks.forEach( callback => callback())
+            }
 
-        resource.on('Δ.change', () => {
-            if(timer) clearTimeout(timer)
-            timer = setTimeout(() => {
-                resource.emit('Δ.sync')
-            }, resource['[[syncRate]]'])
-        })
+            resource.on('Δ.change', () => emit())
+    
+            resource.on('Δ.sync', ({ patches }) => {
+                let batchId = createBatch(resource)
+                socket.emit(`${resource.uid}.sync`, { patches, batchId }, ({updateSuccessful, invalidPatches }) => {
+                    if(!updateSuccessful){
+                        rollbackPatches(resource, invalidPatches)
+                        emit()
+                    }
+                })
+                // emit()
+            })
+    
+            socket.on(`${resource.uid}.mergeBatch`, (batchId) => {
+                mergeBatch(resource, batchId)
+            })
 
-        resource.on('Δ.sync', () => {
-            let patches = stageNewPatches(resource)
-            let batchId = createBatch(resource)
-            socket.emit(`${resource.uid}.sync`, { patches, batchId })
-            callback()
-        })
+            socket.on(`${resource.uid}.mergePatches`, (patches) => {
+                mergePatches(resource, patches)
+                emit()
+            })
 
-        socket.on(`${resource.uid}.commitBatch`, (batchId) => {
-            commitBatch(resource, batchId)
-        })
-        socket.on(`${resource.uid}.mergePatches`, (patches) => {
-            mergePatches(resource, patches)
-            callback()
-        })
+            bin[resource.uid] = { resource, callbacks: [ callback ] }
+        } else {
+            if(!bin[resource.uid].callbacks.includes(callback)) bin[resource.uid].callbacks.push(callback);
+            upstreamMerge(bin[resource.uid].resource, resource);
+
+            resource = bin[resource.uid].resource
+        }
+
         return resource
     }
 

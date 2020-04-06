@@ -3,7 +3,7 @@ import { View, TouchableOpacity, Platform, ScrollView, Animated, PanResponder, M
 
 
 // // Native Paper Components
-import { Provider as StyleProvider, Appbar, Avatar, Menu, Divider, Badge, RadioButton, Snackbar, Portal, ProgressBar, Checkbox, Switch } from 'react-native-paper';
+import { Provider as StyleProvider, Appbar, Avatar, Menu, Divider, Badge, RadioButton, Snackbar, Portal, ProgressBar, Checkbox, DefaultTheme } from 'react-native-paper';
 
 
 
@@ -15,14 +15,13 @@ import { Card, Chip, List, Surface } from './Material'
 import { createGrid, Container, Section, Area } from './Layout'
 import { Button, BubbleButton, ToggleButton } from './Button'
 import { Text, Title, Heading, Subheading, Paragraph, Caption } from './Typography'
-import { TextInput, PasswordInput, TextField, HelperText, ToggleSwitch, FileInput } from './Form'
+import { TextInput, PasswordInput, TextField, HelperText, ToggleSwitch, FileInput, ToggleInput, DateTimeInput, TextArea } from './Form'
 import * as Constants from './constants'
-import { Route, Redirect } from 'react-router';
+import { Route, Redirect, Switch } from 'react-router';
 import { Provider, tether } from './Provider';
 
 
-
-// // import { MaterialIcons as Icon } from '@expo/vector-icons';
+import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
 const { Grid, Column } = createGrid({
     xs: 0,
@@ -35,6 +34,10 @@ const { Grid, Column } = createGrid({
 
 
 export {
+    Icon,
+
+    DefaultTheme,
+    
     Surface,
 
     Constants,
@@ -80,7 +83,7 @@ export {
     Button, BubbleButton, ToggleButton,
 
     // Form
-    TextInput, PasswordInput, TextField, HelperText, ToggleSwitch, RadioButton, FileInput,
+    TextInput, PasswordInput, TextField, HelperText, ToggleSwitch, RadioButton, FileInput, ToggleInput, DateTimeInput, TextArea,
 
     // Material
     Chip, Card, List,

@@ -158,7 +158,7 @@ inflection.toSingular = function (str) {
  * @return {string}
  */
 inflection.toCamelCase = function (str, upper) {
-	str = str.toLowerCase();
+	// str = str.toLowerCase();
 	var parts = str.split(inflection.CommonRegExp.SPACES_OR_UNDERSCORES);
 	for (var i = upper === true ? 0 : 1, ii = parts.length; i < ii; ++i) {
 		var part = parts[i];

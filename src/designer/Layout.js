@@ -5,7 +5,7 @@ import { Portal } from 'react-native-paper'
 
 export const Container = ({ children, style, slim }) => (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{
-        flexGrow: 1, display: 'flex', margin: slim ? 0 : 50, ...style,
+        flexGrow: 1, display: 'flex', marginLeft: slim ? 0 : 50, marginRight: slim ? 0 : 50, ...style,
     }}>
         <View><Portal.Host /></View>
         {renderChildren(children)}
@@ -26,7 +26,8 @@ const alignment = {
     x: {
         left: { marginRight: 'auto' },
         right: { marginLeft: 'auto' },
-        center: { marginRight: 'auto', marginLeft: 'auto'} 
+        center: { marginRight: 'auto', marginLeft: 'auto'},
+        justify: { justifyContent: 'space-around' }
     },
     y: {
         top: { marginBottom: 'auto' },

@@ -1,62 +1,31 @@
-import React, { useState} from 'react';
-import { Model } from './Provider'
-import { Button } from './Button'
-import { TextInput as TextField, View } from 'react-native'
-import { TextInput, HelperText, Switch } from 'react-native-paper'
+import React, { useState, useMemo } from 'react';
+import { TextInput as TextField, View, TouchableOpacity, Text } from 'react-native'
+import { TextInput as RNPTextInput, HelperText, Switch, Subheading } from 'react-native-paper'
+import { Area } from './Layout'
+import { Caption } from './Typography'
+import { FileInput } from './FileInput'
+import { DateTimeInput } from './DateTimeInput'
+import { TextArea } from './TextArea'
 
-const ToggleSwitch = ({ onPress, ...props}) => (
-    <Switch onValueChange={onPress} {...props} />
+const TextInput = ({ onChange, onChangeText, ...props }) => (
+  <RNPTextInput onChangeText={onChange || onChangeText} {...props} />
 )
 
 const PasswordInput = (props) => (
-    <TextInput secureTextEntry={true} {...props} />
+  <TextInput secureTextEntry={true} {...props} />
 )
 
-const FileInput = ({ onChange = () => void(0), multiple = false, path = false, children = 'Upload', ...props }) => {
-    const [ filenames, changeFilenames ] = useState('')
-    const handleChange = (e, url) => {
-        const names = [];
-        const input = e.target;
-        const form = new FormData;
-        for(let index = 0; index < input.files.length; index++){
-            let file = input.files[index]
-            names.push(file.name)
-            form.append(index, file); 
-        }
-        changeFilenames(names.join(', '))
-        form.append('length', input.files.length)
-        form.append('path', path)
-        fetch(`${url}/upload`, {
-            method: 'POST',
-            body: form
-        })
-        .then( res => res.json())
-        .then( urls => {
-            onChange(multiple ? urls : urls[0])
-        })
-    }
-    let input;
-    let chooseFile = () => input.click()
-    return (
-        <View>
-            <Model.Consumer>
-            { models => 
-                <>  
-                    <Button onPress={chooseFile} {...props}>{children}</Button>
-                    <HelperText>{filenames}</HelperText>
-                    <input 
-                        style={{ display: 'none' }}
-                        ref={ x => input = x } 
-                        type="file" 
-                        multiple={multiple} 
-                        onChange={e => handleChange(e, models.url)} 
-                    />
-                </>
-            }
-            </Model.Consumer>
-        </View>
-    )
-    
-}
+const ToggleInput = ({ label, onChange, value, ...props }) => (
+  <Area>
+    <Subheading>{label}</Subheading>
+    <Area alignX="left">
+      <Switch onValueChange={onChange} value={value} {...props} />
+    </Area>
+  </Area>
+)
 
-export { TextField, TextInput, PasswordInput, HelperText, ToggleSwitch, FileInput }
+const ToggleSwitch = ({ onPress, ...props }) => (
+  <Switch onValueChange={onPress} {...props} />
+)
+
+export { TextField, TextInput, PasswordInput, ToggleInput, FileInput, DateTimeInput, HelperText, ToggleSwitch, TextArea }

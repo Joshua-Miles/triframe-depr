@@ -1,5 +1,5 @@
 import socketIo from 'socket.io-client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { withRouter } from 'react-router'
 import { Pipe, EventEmitter, each } from '../core';
 import { Router } from './Router'
@@ -86,13 +86,24 @@ export const tether = Component => props => {
 
 let ConnectedComponent = withRouter(({ props = [], models, Component, history, match, location }) => {
     let jsx = null
+    let pipe = null
 
-    const [data, dispatch] = useState({ jsx })
-    const propsArray = Object.values(props)
+    let propsArray = Object.values(props).map( prop => JSON.stringify(prop))
+
+    const [agent] = useState( new EventEmitter )
+
+    const [data, dispatch] = useState({ jsx, pipe });
+
+    ({jsx, pipe } = data)
+
     const getHistory = () => ({ history, match, location })
 
+    useEffect( () => {
+        agent.emit('props', props)
+    }, propsArray)
+
     useEffect(() => {
-        let pipe;
+    
         if (models.areReady === false) return
 
         let whileLoading = (jsx) => dispatch({ jsx })
@@ -122,17 +133,26 @@ let ConnectedComponent = withRouter(({ props = [], models, Component, history, m
         let afterRender = callback => runAfterRender = callback
 
         let payload = { models, props, redirect, useContext, useRouter, whileLoading, onError, catchErrors, afterRender }
-        pipe = new Pipe(() => Component(payload), payload)
-        pipe.observe(jsx => {
-            dispatch({ jsx, runAfterRender })
+        let emit;
+        agent.on('props', props => {
+            payload.props = props
+            if(emit) emit.pipe.forceReload()
         })
-        // TODO: A thing here?
+        pipe = new Pipe((x) => {
+            emit = x
+            return Component(payload)
+        }, payload)//.debounce()
+
+        pipe.observe(jsx => {
+            dispatch({ jsx, runAfterRender, pipe })
+        })
+
         pipe.catch(err => console.log(Component.name, err))
         return () => pipe && pipe.destroy()
 
-    }, [models.areReady, ...propsArray])
+    }, [models.areReady])
     useEffect(() => {
         if (typeof data.runAfterRender == 'function') data.runAfterRender()
     })
-    return data.jsx
+    return jsx
 })

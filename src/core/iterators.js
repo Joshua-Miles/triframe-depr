@@ -167,15 +167,6 @@ const findAsync = async function (object, callback) {
     return result;
 }
 
-const remove = (collection, targetElement) => {
-    let targetKeys = [];
-    each(collection, (key, value) => {
-        if (targetElement === value) {
-            targetKeys.push(key)
-        }
-    })
-    targetKeys.forEach(key => delete collection[key])
-}
 const primativeTypes = ['String', 'Boolean', 'Number', 'Date', 'Function']
 const isPlain = value => value && typeof value === 'object' && !primativeTypes.includes(value.constructor.name)
 
@@ -190,8 +181,13 @@ const deepMap = (obj, callback) => {
     }
 }
 
-const snapshot = obj => JSON.parse(JSON.stringify(obj))
 
 export {
-    each, filter, map, group, index, find, deepMap, unique
+    group, index, 
+
+    each, filter, map, find,
+    eachSync, filterSync, mapSync, findSync,
+    eachAsync, filterAsync, mapAsync, findAsync,
+    
+    deepMap, unique
 }

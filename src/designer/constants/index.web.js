@@ -1,4 +1,5 @@
 import Constants from 'expo-constants'
+import './polyfill.css'
 const hostUri = window.location.host
 const [ hostDomain ] = hostUri.split(':')
 const { env } = Constants.manifest.extra

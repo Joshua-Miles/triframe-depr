@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Button as Pressable, FAB, ToggleButton } from 'react-native-paper'
+import { Button as Pressable, FAB, ToggleButton, withTheme } from 'react-native-paper'
 import { View } from 'react-native'
 
-const Button = ({ children, mode = "contained", ...rest }) => (
+const Button = withTheme(({ children, mode = "contained", theme, color, ...rest }) => (
     // <View style={{ flexDirection: 'row' }}>
-        <Pressable style={{ padding: 5, margin: 5 }} mode={mode} {...rest}>{children}</Pressable>
+        <Pressable style={{ padding: 5, margin: 5 }} mode={mode} color={theme.colors[color] || color } {...rest}>{children}</Pressable>
     // </View>
-)
+))
 
 const BubbleButton = (props) => (
     <FAB

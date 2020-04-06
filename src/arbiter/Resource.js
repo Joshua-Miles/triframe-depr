@@ -2,7 +2,25 @@ import { each, EventEmitter, toTitleCase } from "triframe/core"
 import { initializeResource } from './core'
 
 
+
 export class Resource extends EventEmitter {
+
+    static events = new EventEmitter
+
+    static on(event, callback){
+        if(Array.isArray(event)) event = event.map(event => `${this.name}.${event}`)
+        else event = `${this.name}.${event}`
+        return this.events.on(event, callback)
+    }
+    static emit(event, ...args){
+        console.log(`Emitting: ${this.name}.${event}`)
+        return this.events.emit(`${this.name}.${event}`, ...args)
+    }
+    static nowAndOn(event, callback){
+        if(Array.isArray(event)) event = event.map(event => `${this.name}.${event}`)
+        else event = `${this.name}.${event}`
+        return this.events.nowAndOn(event, callback)
+    }
 
     constructor(attributes = {}) {
         super()
@@ -21,23 +39,34 @@ export class Resource extends EventEmitter {
 
 
     set(attributes) {
-        Object.assign(this, attributes)
+        let patches = []
+        each(attributes, ( key, value ) => {
+            let patch = {
+                op: 'replace',
+                path: `/${key}`,
+                value
+            }
+            patches.push(patch)
+        })
+        this.emit('Δ.change', patches)
+        this['[[patches]]'].push(...patches)
+        Object.assign(this['[[attributes]]'], attributes)
     }
 
 }
 
-
-    Object.defineProperty(Resource.prototype, '[[validation]]', {
-        writable: true,
-        enumerable: false,
-        value: createResourceValidator()
-    })
+Object.defineProperty(Resource.prototype, '[[validation]]', {
+    writable: true,
+    enumerable: false,
+    value: createResourceValidator()
+})
 
 function createResourceValidator() {
 
     let handlers = {};
 
     return {
+        handlers,
         for: (resource) => { 
             
             if(!resource['[[validationState]]']) Object.defineProperty(resource, '[[validationState]]', {
@@ -57,7 +86,7 @@ function createResourceValidator() {
                     const property = resource[propertyName]
                     const errors = []
                     const label = toTitleCase(propertyName)
-                    validators.forEach(validator => validator({ property, label, errors, resource }))
+                    validators.forEach(validator => validator.call(resource, { property, label, errors, resource }))
                     return errors
                 } else {
                     return []

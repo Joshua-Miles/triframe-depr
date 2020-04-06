@@ -1,4 +1,4 @@
-import { sql } from "./sql";
+import { sql, literal } from "./sql";
 import { Model } from "./Model";
 import {
     
@@ -50,11 +50,13 @@ import {
 
     hasOne,
 
-    _public,
-
-    _protected,
-
-    _private,
+    hidden,
+    
+    readonly,
+    
+    hiddenUnless,
+    
+    readonlyUnless,
 
     shared,
     
@@ -73,6 +75,8 @@ export {
     // serve, 
     
     connect,
+
+    literal,
 
     sql, 
     
@@ -111,11 +115,13 @@ export {
 
     hasOne,
 
-    _public,
-
-    _protected,
-
-    _private,
+    hidden,
+    
+    readonly,
+    
+    hiddenUnless,
+    
+    readonlyUnless,
 
     shared,
     

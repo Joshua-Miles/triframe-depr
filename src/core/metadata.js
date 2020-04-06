@@ -22,7 +22,7 @@ const saveMetadata = (target, key, metadata) => {
     let placement = typeof target == 'function' ? '.' : '#'
     let namespace = `${Class.name}${placement}${key}`
     store[namespace] = store[namespace] || {}
-    Object.assign(store[namespace], { ...metadata, className: Class.name, key, Class: Class })
+    Object.assign(store[namespace], { ...metadata, className: Class.name, key, Class: Class, namespace })
 }
 
 const metadata = store;

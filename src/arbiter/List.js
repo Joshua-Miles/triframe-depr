@@ -58,6 +58,25 @@ export class List extends Array {
     }
 
 
+    map$(callback){
+        let patches = []
+        this.forEach( (element, index) => {
+            let value = callback(element, index)
+            if(value != element){
+                this[index] = value
+                let patch = {
+                    op: 'replace',
+                    path: `/${index}`,
+                    value
+                }
+                patches.push(patch)
+            }
+        })
+        this["[[patches]]"].push(...patches)
+        this.emit('Δ.change', patches)
+    }
+
+
     remove(index){
         this.splice(index, 1)
         let patch = {

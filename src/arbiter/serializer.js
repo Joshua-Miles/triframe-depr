@@ -1,7 +1,9 @@
-import { each, map, filter, EventEmitter, getMetadata } from 'triframe/core'
+import { each, map, mapAsync, filter, EventEmitter, getMetadata } from 'triframe/core'
 import { Resource } from './Resource'
-import { List } from './List'
-import { appendPatches, commitBatch, mergePatches, stageNewPatches, createBatch } from './core'
+import { createCache, mergeBatch, mergePatches, stageNewPatches, createBatch, archivePatchesFor, updateResource } from './core'
+
+
+const DEV_AUDIT = true
 
 const primativeTypes = ['String', 'Boolean', 'Number', 'Date', 'Function']
 const skippedPrototypes = [Object.prototype, Function.prototype, Resource.prototype, Resource, EventEmitter.prototype, undefined, null]
@@ -29,17 +31,18 @@ export const createSerializer = io => {
                 }
             })
         }
-        return map($interface, (key, value) => {
-            const descriptor = descriptors[key]
-            const metadata = getMetadata(object, key)
-            const { accessLevel } = metadata;
-            if (accessLevel === 'private') return null
-            if (isClass(value, descriptor)) return serializeClass(`${name}/${key}`, value, descriptor, metadata, object, key)
-            if (isObject(value, descriptor)) return serializeObject(`${name}/${key}`, value, descriptor, metadata, object, key)
-            if (isFunction(value, descriptor)) return serializeFunction(`${name}/${key}`, value, descriptor, metadata, object, key)
-            if (isProperty(value, descriptor)) return serializeProperty(`${name}/${key}`, value, descriptor, metadata, object, key)
-            if (isAttribute(value, descriptor)) return serializeAttribute(`${name}/${key}`, value, descriptor, metadata, object, key)
-        })
+        return {
+            type: 'object',
+            attributes: map($interface, (key, value) => {
+                const descriptor = descriptors[key]
+                const metadata = getMetadata(object, key)
+                if (isClass(value, descriptor)) return serializeClass(`${name}/${key}`, value, descriptor, metadata, object, key)
+                if (isObject(value, descriptor)) return serializeObject(`${name}/${key}`, value, descriptor, metadata, object, key)
+                if (isFunction(value, descriptor)) return serializeFunction(`${name}/${key}`, value, descriptor, metadata, object, key)
+                if (isProperty(value, descriptor)) return serializeProperty(`${name}/${key}`, value, descriptor, metadata, object, key)
+                if (isAttribute(value, descriptor)) return serializeAttribute(`${name}/${key}`, value, descriptor, metadata, object, key)
+            }),
+        }
     }
 
     const serializeClass = function (name, Class) {
@@ -49,12 +52,7 @@ export const createSerializer = io => {
             type: 'class',
             className: Class.name,
             classMethods: serializeMethods(name, Class),
-            instanceMethods: {
-                ...serializeMethods(`${name}/#`, instance), sync: serializeFunction(
-                    `${name}/#/sync`, instance.sync, {}, {}, instance
-                )
-            }
-
+            instanceMethods: serializeMethods(`${name}/#`, instance)
         }
     }
 
@@ -79,50 +77,77 @@ export const createSerializer = io => {
 
 
     const serializeFunction = function (name, value, descriptor, metadata, parent) {
-        const { isShared, accessLevel, authCheck, usesSession } = metadata;
+        const { isShared, readAccessTest, usesSession, isStream, original } = metadata;
         if (isShared) {
             return {
+                isStream,
                 name,
                 type: 'shared-function',
-                value: value.toString()
+                value: isStream ? original.toString() : value.toString()
             }
         } else {
             io.on(name, async ({ args, uid, patches, connection, send, onClose }) => {
+                
                 connection.cache = connection.cache || createCache(connection)
-                const sendSerialized = (value, keepOpen) => {
-                    if (usesSession) connection.session.save()
-                    send(serializeDocument(value, connection), keepOpen)
-                }
 
-                const target = (
+                const { session } = connection
+                const resource = (
                     uid
-                        ? connection.cache.getCached(uid)
+                        ? await connection.cache.getCached(uid)
                         : typeof parent === 'function' ? parent : new parent.constructor
                 )
 
-                if (patches) appendPatches(target, patches)
+                let { updateSuccessful, invalidPatches } = await updateResource(resource, patches, session)
 
-                if (accessLevel === 'private' || (accessLevel === 'protected' && ! await authCheck(connection.session, target))) {
+                if(!updateSuccessful){
+                    return send({ error: true, invalidPatches, message: 'You are not authorized to update the resource as requested' })
+                }
+
+                if ( readAccessTest !== undefined &&  !await readAccessTest.call(resource, { session, resource })) {
                     return send({ error: true, message: 'You are not authorized to call this method' })
                 }
+                
+                let result, methodSession, accessSession = connection.session.createSlice();
 
-                if (usesSession) args.unshift(connection.session)
-                let result;
-                try {
-                    result = value.apply(target, args)
-                } catch (err) {
-                    send({ error: true, message: err.message })
+                const sendSerialized = async (value, keepOpen) => {
+                    if (usesSession) methodSession.save()
+                    const cache = connection.cache
+                    const session = accessSession
+                    const callback = () => sendSerialized(value, keepOpen)
+                    let serialized = await serializeDocument(value, { cache, session, callback })
+                    send(serialized, keepOpen)
                 }
-                if (result && result.catch) result.catch(err => send({ error: true, message: err.message }))
-                if (isPipe(result)) {
-                    result.observe(value => sendSerialized(value, true))
-                    onClose(() => result.destroy())
-                } else if (isPromise(result)) {
-                    result.then(value => sendSerialized(value))
-                } else {
-                    sendSerialized(result)
+
+                if (usesSession) {
+                    methodSession = connection.session.createSlice()
+                    args.unshift(methodSession)
+                    methodSession.onChange(() => run())
                 }
+
+                let run = () => {
+                    if(result && result.destroy) result.destroy()
+                    try {
+                        result = value.apply(resource, args)
+                    } catch (err) {
+                        send({ error: true, message: err.message })
+                    }
+                    if (result && result.catch) result.catch(err => send({ error: true, message: err.message }))
+                    if (isPipe(result)) {
+                        result.observe(value => sendSerialized(value, true))
+                        onClose(() => {
+                            result.destroy()
+                            if(methodSession) methodSession.removeListeners()
+                            if(accessSession) accessSession.removeListeners()
+                        })
+                    } else if (isPromise(result)) {
+                        result.then(value => sendSerialized(value))
+                    } else {
+                        sendSerialized(result)
+                    }
+                }
+                run()
             })
+
             return {
                 name,
                 type: 'remote-function'
@@ -136,6 +161,7 @@ export const createSerializer = io => {
             name,
             key: key,
             type: 'property',
+            enumerable: descriptor.enumerable,
             get: serializeFunction(`${name}.get`, descriptor.get || (() => null), descriptor, metadata, object),
             set: serializeFunction(`${name}.set`, descriptor.set || (() => null), descriptor, metadata, object),
             validators: validators && validators.map(validator => validator.toString())
@@ -168,87 +194,28 @@ const isAttribute = (value, descriptor) => [isClass, isObject, isFunction, isPro
 const isPipe = value => value && typeof value.observe == 'function'
 const isPromise = value => value && typeof value.then == 'function' && !isPipe(value)
 
-const global = {}
-
-const createCache = ({ socket }) => {
-
-    const bin = {}
-
-    function cache(resource =  {}) {
-
-        global[resource.uid] = global[resource.uid] || { patches: [], branches: [] }
-
-        mergePatches(resource, global[resource.uid].patches)
-
-        if (!bin[resource.uid]) {
-            bin[resource.uid] = resource            
-        
-            global[resource.uid].branches.push({ socket, resource })
-
-            socket.on(`${resource.uid}.sync`, ({ batchId, patches }) => {
-                appendPatches(resource, patches)
-                sync(batchId)
-                // TODO: DONT RECONCILE CHANGES UNTIL ALL PENDING UPDATES HAVE BEEN CONFIRMED (?)
-                socket.emit(`${resource.uid}.commitBatch`, batchId)
-            })
-
-            resource.on('Δ.sync', () => {
-                stageNewPatches(resource)
-                const batchId = createBatch(resource)
-                sync(batchId, { includeSelf: true })
-            })
-
-            let pendingCommits = []
-            resource.on('Δ.commiting', () => {
-                pendingCommits.push([ ...global[resource.uid].patches ])
-            })
-
-            resource.on('Δ.commited', () => {
-                let committedPatches = pendingCommits.shift()
-                global[resource.uid].patches = global[resource.uid].patches.filter( patch => !committedPatches.includes(patch))
-            })
-        }
-
-
-        const sync = (batchId, { includeSelf = false } = {}) => {
-            const patches = commitBatch(resource, batchId)
-            global[resource.uid].patches.push(...patches)
-            global[resource.uid].branches.forEach(({ socket: otherSocket, resource }) => {
-                if (socket != otherSocket || includeSelf) {
-                    mergePatches(resource, patches)
-                    otherSocket.emit(`${resource.uid}.mergePatches`, patches)
-                }
-            })
-        }
-
-        return resource
-    }
-
-    function getCached(uid) {
-        return bin[uid]
-    }
-
-    return { cache, getCached }
-}
-
-
-const serializeDocument = function (document, connection) {
-    const next = document => serializeDocument(document, connection)
+const serializeDocument = async function (document, { cache, session, callback }) {
+    const next = document => serializeDocument(document, { cache, session, callback })
     if (!document) return document
     if (isClass(document)) return { _class_: document.name }
     if (isPrimative(document)) return document
-    if (isArray(document)) return document.map((element, index) => next(element))
-    if (isObject(document)) return map(document, (propertyName, object) => next(object))
-
-    document = connection.cache.cache(document)
-
+    if (isArray(document)) return await Promise.all(document.map((element, index) => next(element)))
+    if (isObject(document)) return await mapAsync(document, (propertyName, object) => next(object))
+    cache.cache(document) 
     if (isDocument(document)) return {
-        ...map(document['[[attributes]]'], (propertyName, object) => {
+        ... await mapAsync(document['[[attributes]]'], async (propertyName, propertyValue) => {
             const metadata = getMetadata(document, propertyName)
-            const { accessLevel, authCheck } = metadata;
-            if (accessLevel == 'private') return null
-            if (accessLevel == 'protected' && !authCheck(connection.session)) return null
-            return next(object)
+            const { readAccessTest, namespace } = metadata;
+            if(readAccessTest === undefined){
+                return await next(propertyValue)
+            } else {
+                session.onChange( callback )
+                const resource = document
+                const result = readAccessTest.call(resource, { session, resource })
+                if(result instanceof Promise && DEV_AUDIT) console.warn(`Running Asynchronous Authentication Checks for ${namespace} during serailization`)
+                if(!await result) return null
+                else return await next(propertyValue)
+            } 
         }),
         _proto_: document.constructor.name
     }

@@ -121,11 +121,61 @@ export class EventEmitter {
 
     matches(predicate, event){
         if(event === predicate) return true
-        if(event.endsWith('*') && (predicate.startsWith(event.substr(0, event.length -1)) || predicate.startsWith('*'))) return true
-        if(event.startsWith('*') && (predicate.endsWith(event.substr(1)) || predicate.endsWith('*'))) return true
-        if(predicate.endsWith('*') && event.startsWith(predicate.substr(0, predicate.length -1))) return true
-        if(predicate.startsWith('*') && event.endsWith(predicate.substr(1)) ) return true
-        return false
+
+        if(predicate === event) return true
+        let predicateSegments = predicate.split('.')
+        let eventSegments = event.split('.')
+        
+        let i = 0
+        let ii = 0
+    
+        while(true){
+            let currentPredicateSegment = predicateSegments[i]
+            let currentEventSegment = eventSegments[ii]
+            let previousPredicateSegment = predicateSegments[i - 1]
+            let previousEventSegment = eventSegments[ii -1]
+            
+            if(i === predicateSegments.length && ii == eventSegments.length){
+                return true
+            } 
+            if(i === predicateSegments.length || ii == eventSegments.length){
+                return false
+            }
+            if(currentPredicateSegment === '*' && i === predicateSegments.length - 1){
+                return true
+            }
+            if(currentEventSegment === '*' && i === eventSegments.length - 1){
+                return true
+            }
+            if(currentPredicateSegment === currentEventSegment){
+                i++
+                ii++
+                continue
+            }
+            if(currentPredicateSegment === '*' || currentEventSegment === '*'){
+                i++
+                ii++
+                continue
+            }
+            if(currentPredicateSegment === '*' || currentEventSegment === '*'){
+                i++
+                ii++
+                continue
+            }
+            if(previousPredicateSegment === '*' && i === 1){
+                ii++
+                continue
+            }
+            if(previousEventSegment === '*' && ii === 1){
+                i++
+                continue
+            }
+            return false
+        }
+    }
+
+    toJSON(){
+        return {}
     }
 
 

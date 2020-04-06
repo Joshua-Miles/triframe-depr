@@ -1,4 +1,5 @@
 import { saveMetadata, getMetadata, toForeignKeyName, each, metadata, index, Pipe, toCamelCase } from 'triframe/core'
+import { Resource } from 'triframe/arbiter'
 
 //  ---------------------- DATATYPES ----------------------
 
@@ -126,7 +127,7 @@ export const virtual = createDecorator(({ decoratorArgs: [definition], target, k
     }
 })
 
-export const hasMany = createDecorator(({ decoratorArgs: [options = {}], target, key, fieldValue }) => {
+export const hasMany = createPropertyDecorator(({ decoratorArgs: [options = {}], target, key, fieldValue }) => {
     Object.defineProperty(target, key, createDocumentProperty(key))
     return {
         isShared: true,
@@ -137,7 +138,7 @@ export const hasMany = createDecorator(({ decoratorArgs: [options = {}], target,
     }
 })
 
-export const hasOne = createDecorator(({ decoratorArgs: [options = {}], target, key, fieldValue }) => {
+export const hasOne = createPropertyDecorator(({ decoratorArgs: [options = {}], target, key, fieldValue }) => {
     Object.defineProperty(target, key, createDocumentProperty(key))
     return {
         isShared: true,
@@ -148,13 +149,19 @@ export const hasOne = createDecorator(({ decoratorArgs: [options = {}], target, 
     }
 })
 
-export const belongsTo = createDecorator(({ decoratorArgs: [options = {}], target, key, fieldValue }) => {
+export const belongsTo = createPropertyDecorator(({ decoratorArgs: [options = {}], target, key, fieldValue }) => {
     let foreignKey = toCamelCase( toForeignKeyName(key) )
     saveMetadata(target, foreignKey, {
         type: 'persisted',
         datatype: 'int4',
         isShared: true
     })
+    // hasMany would listen for a foreign key change on this side
+    // target.constructor.on(`*.changed.${foreignKey}`, (e, event) => {
+    //     let [ id ] = event.split('.')
+    //     target.constructor.emit(`${id}.changed.${key}`)
+    // })
+
     Object.defineProperty(target, key, createDocumentProperty(key))
     Object.defineProperty(target, foreignKey, createDocumentProperty(foreignKey))
     return {
@@ -168,18 +175,43 @@ export const belongsTo = createDecorator(({ decoratorArgs: [options = {}], targe
 
 //  --------------------- ACCESS LEVELS --------------------
 
-export const _public = createDecorator(({ decoratorArgs, fieldValue }) => ({
-    accessLevel: 'public'
+
+// export const read =  createDecorator(({ decoratorArgs, fieldValue }) => ({
+//     readAccess: decoratorArgs[0],
+//     readAccessTest: decoratorArgs[1]
+// }))
+
+// export const write =  createDecorator(({ decoratorArgs, fieldValue }) => ({
+//     writeAccess: decoratorArgs[0],
+//     writeAccessTest: decoratorArgs[1]
+// }))
+
+// export const access =  createDecorator(({ decoratorArgs, fieldValue }) => ({
+//     readAccess: decoratorArgs[0],
+//     writeAccess: decoratorArgs[0],
+//     readAccessTest: decoratorArgs[1],
+//     readAccessTest: decoratorArgs[1]
+
+// }))
+
+
+
+export const hidden =  createDecorator(({ decoratorArgs, fieldValue }) => ({
+   readAccessTest: () => false
 }))
 
-export const _protected = createDecorator(({ decoratorArgs, fieldValue }) => ({
-    accessLevel: 'protected',
-    authCheck: decoratorArgs[0]
+export const readonly =  createDecorator(({ decoratorArgs, fieldValue }) => ({
+   writeAccessTest: () => false
 }))
 
-export const _private = createDecorator(({ decoratorArgs, fieldValue }) => ({
-    accessLevel: 'private'
+export const hiddenUnless =  createDecorator(({ decoratorArgs, fieldValue }) => ({
+   readAccessTest: decoratorArgs[0]
 }))
+
+export const readonlyUnless =  createDecorator(({ decoratorArgs, fieldValue }) => ({
+   writeAccessTest: decoratorArgs[0]
+}))
+
 
 
 //  ---------------------- MISC ----------------------
@@ -201,9 +233,7 @@ export const validate = createDecorator(({ decoratorArgs, target, key, fieldValu
 })
 
 export const include = (...models) => decorated => {
-  
 
-    let modelNames = index(models, 'name')
     register( (target) => {    
 
         let Class = typeof target === 'function' ? target : target.constructor
@@ -223,26 +253,61 @@ export const include = (...models) => decorated => {
 
             // Copy Prototype
             each(Object.getOwnPropertyDescriptors(Model.prototype), (key, descriptor) => {
-                if(key === 'constructor') return
+                if(key === 'constructor' || key === 'onConstruct' || key === '[[validation]]') return
                 let metadata = getMetadata({ __proto__: { constructor: Model } }, key)
                 if(!isEmpty(metadata)) saveMetadata(prototype, key, metadata)
                 Object.defineProperty(prototype, key, descriptor)
             })
 
-        })
+            if(Model.prototype['[[validation]]']){
+                if(prototype['[[validation]]']) prototype['[[validation]]'].handlers = { ...prototype['[[validation]]'].handlers, ...Model.prototype['[[validation]]'].handlers }
+                else prototype['[[validation]]'] = Model.prototype['[[validation]]']
+            }    
+
+        })    
+        
     })(decorated) 
+
+
+    initialize((object) => {
+        each(models, (key, Model) => {
+            if(Model.prototype.onConstruct) Model.prototype.onConstruct.call(object)
+        })
+    })(decorated)
 }
 
+function createStream(method, prependEmit = false){
+    const process = function(emit, ...args){
+        if(prependEmit) args.unshift(emit)
+        return method.call(this, ...args)
+    }
+    return function(...args){
+        return new Pipe([this, process], ...args)
+    }
+}
 
-export const stream = decorated => {
-    wrap(method => {
-        const process = function(emit, ...args){
-            return method.call(this, ...args)
-        }
-        return function(...args){
-            return new Pipe([this, process], ...args)
-        }
-    })(decorated)
+export const stream = (decorated, prependEmit = false) => {
+    if(typeof decorated === 'object'){
+        let original;
+        register( (target, key) => {
+            saveMetadata( target, key, {
+                isStream: true,
+                prependEmit,
+                original
+            })
+        })(decorated)
+        wrap(method => {
+            original = method
+            return createStream(method,prependEmit)
+        })(decorated)
+        return decorated
+    } 
+    if(typeof decorated === 'function'){
+        return createStream(decorated,prependEmit)
+    }
+    if(typeof decorated === 'boolean'){
+        return x => stream(x, decorated)
+    } 
 }
 
 // TODO: VALIDATION DECORATOR
@@ -287,6 +352,7 @@ function createDecorator(define) {
                 ...define({ decoratorArgs, target, key, fieldValue, isMethod })
             })
         )(decorated)
+        
     }
 
     return function (...args) {
@@ -326,11 +392,11 @@ function register(callback) {
                     callback(Class)
                     break;
                 case 'static':
-                    value = decorated.kind === 'field' && typeof initializer === 'function' ? initializer() : undefined
+                    value = decorated.kind === 'field' && typeof initializer === 'function' ? initializer() : decorated.descriptor?.value
                     callback(Class, decorated.key, value)
                     break;
                 default:
-                    value = decorated.kind === 'field' && typeof initializer === 'function' ? initializer() : undefined
+                    value = decorated.kind === 'field' && typeof initializer === 'function' ? initializer() : decorated.descriptor?.value
                     callback(Class.prototype, decorated.key, value, decorated.kind === 'method')
 
             }
@@ -361,18 +427,17 @@ function wrap(callback) {
 function initialize(callback) {
     return function (decorated) {
         let temp = Symbol()
-        return {
-            ...decorated,
+        decorated.extras = [  {
             kind: 'field',
-            placement: decorated.placement,
+            placement: 'own',
             key: temp,
             descriptor: {},
             initializer() {
                 delete this[temp]
-                let value = typeof decorated.initializer === 'function' ? decorated.initializer() : undefined
-                callback(this, decorated.key, value)
+                // let value = typeof decorated.initializer === 'function' ? decorated.initializer() : undefined
+                callback(this)
             }
-        }
+        } ]
     }
 }
 
