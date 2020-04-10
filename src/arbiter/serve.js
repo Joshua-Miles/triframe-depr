@@ -51,7 +51,7 @@ const httpRedirectMiddleware = (req, res, next) => {
 }
 
 const defaultConfig = {
-    port: process.env.PORT || 8080,
+    port: process.env.PORT || 80,
     models: {},
     session: {},
     database: {
