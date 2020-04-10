@@ -101,6 +101,7 @@ export async function serve(configArgument) {
     io.on('connection', socketHandler)
 
     server.listen(config.port)
+    console.log(`Listening on ${config.port}`)
 }
 
 
