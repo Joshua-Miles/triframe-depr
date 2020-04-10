@@ -133,15 +133,13 @@ let ConnectedComponent = withRouter(({ props = [], models, Component, history, m
         let afterRender = callback => runAfterRender = callback
 
         let payload = { models, props, redirect, useContext, useRouter, whileLoading, onError, catchErrors, afterRender }
-        let emit;
+        
         agent.on('props', props => {
             payload.props = props
-            if(emit) emit.pipe.forceReload()
+            if(pipe) pipe.forceReload()
         })
-        pipe = new Pipe((x) => {
-            emit = x
-            return Component(payload)
-        }, payload)//.debounce()
+
+        pipe = new Pipe((x) =>  Component(payload), payload)//.debounce()
 
         pipe.observe(jsx => {
             dispatch({ jsx, runAfterRender, pipe })

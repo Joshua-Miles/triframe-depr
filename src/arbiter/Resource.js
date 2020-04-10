@@ -1,7 +1,7 @@
 import { each, EventEmitter, toTitleCase } from "triframe/core"
 import { initializeResource } from './core'
 
-
+const batchFlag = Symbol()
 
 export class Resource extends EventEmitter {
 
@@ -20,6 +20,20 @@ export class Resource extends EventEmitter {
         if(Array.isArray(event)) event = event.map(event => `${this.name}.${event}`)
         else event = `${this.name}.${event}`
         return this.events.nowAndOn(event, callback)
+    }
+
+    emit(event, ...args){
+        if(this[batchFlag] && event == 'Δ.change') return null
+        else return super.emit(event, ...args)
+    }
+
+    startBatchUpdate(){
+        this[batchFlag] = true
+    }
+
+    commitBatchUpdate(){
+        this[batchFlag] = false
+        this.emit('Δ.change')
     }
 
     constructor(attributes = {}) {

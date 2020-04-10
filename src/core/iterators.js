@@ -181,6 +181,28 @@ const deepMap = (obj, callback) => {
     }
 }
 
+function deepMerge(obj1, obj2) {
+    switch (typeof obj2) {
+        case "object":
+            if(!obj1) return obj1 || obj2
+
+            if(obj1['[[attributes]]']){
+                obj1['attributes'] = deepMerge(obj1['[[attributes]]'], obj2['[[attributes]]'])
+                obj1['base'] = deepMerge(obj1['[[base]]'], obj2['[[base]]'])
+                return obj1
+            }
+
+            if(Array.isArray(obj2)){
+                return obj2.map( (obj2, i) => obj1[i] && obj1[i].uid == obj2.uid ? deepMerge( obj1[i], obj2) : obj2)
+            }
+
+            return { ...obj1, ...map(obj2, (k, obj2) => deepMerge(obj1[k], obj2)) }
+        case "undefined":
+            return null; //this is how JSON.stringify behaves for array items
+        default:
+            return obj2; //no need to clone primitives
+    }
+}
 
 export {
     group, index, 
@@ -189,5 +211,5 @@ export {
     eachSync, filterSync, mapSync, findSync,
     eachAsync, filterAsync, mapAsync, findAsync,
     
-    deepMap, unique
+    deepMap, unique, deepMerge
 }

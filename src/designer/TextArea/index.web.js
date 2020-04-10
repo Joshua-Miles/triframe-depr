@@ -1,5 +1,20 @@
 import React, { useEffect, useState } from 'react'
-import { TextInput } from 'react-native'
+import { TextInput as NativeInput } from 'react-native'
+
+const TextInput = ({ value, onChange, $ref, ...rest}) => {
+    let [ cached ] = useState({ value: value, key: 1 })
+    if(value !== cached.value) cached.key = cached.key + 1
+    return <NativeInput 
+        ref={$ref}
+        key={cached.key}
+        defaultValue={value}
+        onChange={e => {
+            cached.value = e.target.value
+            if(onChange) onChange(e)
+        }}
+        {...rest}
+    />
+}
 
 let sizingProps = [
     'borderBottomWidth',
@@ -67,7 +82,7 @@ export const TextArea = ({ value, onChange, onChangeText, ...props }) => {
     let height = hiddenArea ? hiddenArea.scrollHeight : 'auto'
     return (  
         <TextInput
-            ref={x => element = x}
+            $ref={x => element = x}
             style={{ width: '100%', height, overflow: 'hidden' }}
             multiline
             value={value}

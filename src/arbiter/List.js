@@ -2,7 +2,7 @@ import { EventEmitter } from "triframe/core"
 
 export class List extends Array {
 
-    constructor(...elements){
+    constructor(...elements) {
         super(...elements)
         Object.defineProperty(this, '[[patches]]', {
             enumerable: false,
@@ -14,17 +14,17 @@ export class List extends Array {
         })
     }
 
-    on(...args){
+    on(...args) {
         return this['[[events]]'].on(...args)
     }
 
-    emit(...args){
+    emit(...args) {
         return this['[[events]]'].emit(...args)
     }
 
-    push(...elements){
+    push(...elements) {
         let length = this.length
-        let patches = elements.map( element => ({
+        let patches = elements.map(element => ({
             op: 'add',
             path: `/${length++}`,
             value: element
@@ -33,8 +33,8 @@ export class List extends Array {
         this.emit('Δ.change', patches)
         super.push(...elements)
     }
-    
-    insert(element, index){
+
+    insert(element, index) {
         this.splice(index, 0, element)
         let patch = {
             op: 'add',
@@ -42,11 +42,11 @@ export class List extends Array {
             value: element
         }
         this["[[patches]]"].push(patch)
-        this.emit('Δ.change', [ patch ])
+        this.emit('Δ.change', [patch])
     }
 
-    
-    replace(index, value){
+
+    replace(index, value) {
         this[index] = value
         let patch = {
             op: 'replace',
@@ -54,15 +54,15 @@ export class List extends Array {
             value
         }
         this["[[patches]]"].push(patch)
-        this.emit('Δ.change', [ patch ])
+        this.emit('Δ.change', [patch])
     }
 
 
-    map$(callback){
+    map$(callback) {
         let patches = []
-        this.forEach( (element, index) => {
+        this.forEach((element, index) => {
             let value = callback(element, index)
-            if(value != element){
+            if (value != element) {
                 this[index] = value
                 let patch = {
                     op: 'replace',
@@ -77,13 +77,17 @@ export class List extends Array {
     }
 
 
-    remove(index){
-        this.splice(index, 1)
-        let patch = {
-            op: 'remove',
-            path: `/${index}`
+    remove(start, end = null) {
+        if (end == null) end = start
+        this.splice(start, 1 + end - start)
+        let patches = []
+        for (let index = start; index <= end; index++) {
+            patches.push({
+                op: 'remove',
+                path: `/${start}`
+            })
         }
-        this["[[patches]]"].push(patch)
-        this.emit('Δ.change', [ patch ])
+        this["[[patches]]"].push(...patches)
+        this.emit('Δ.change', patches)
     }
 }

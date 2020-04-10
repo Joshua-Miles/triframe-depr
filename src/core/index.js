@@ -2,7 +2,8 @@ import {
     group, index, unique, deepMap,
     each, filter, map, find,
     eachSync, filterSync, mapSync, findSync,
-    eachAsync, filterAsync, mapAsync, findAsync
+    eachAsync, filterAsync, mapAsync, findAsync,
+    deepMerge
 } from './iterators'
 import { EventEmitter } from './EventEmitter'
 import { toPlural, toSingular, toCamelCase, toPascalCase, toTitleCase, toDashed, toUnderscored, toHumanized, toCapitalized, toTableName, toClassName, toForeignKeyName, replaceNumbersWithOrdinals, toColumnName } from './inflection'
@@ -13,7 +14,8 @@ export {
     group, index, unique, deepMap,
     each, filter, map, find,
     eachSync, filterSync, mapSync, findSync,
-    eachAsync, filterAsync, mapAsync, findAsync
+    eachAsync, filterAsync, mapAsync, findAsync,
+    deepMerge
 }
 export { EventEmitter }
 export { toPlural, toSingular, toCamelCase, toPascalCase, toTitleCase, toDashed, toUnderscored, toHumanized, toCapitalized, toTableName, toClassName, toForeignKeyName, replaceNumbersWithOrdinals, toColumnName }

@@ -129,11 +129,18 @@ class Model {
                     ${literal(columns)}
                 }
             }
-            WHERE ${all(conditions, (key, value, rawValue) =>
-            rawValue === null
-                ? `"${relation.value}".${key} IS NULL`
-                : `"${relation.value}".${key} = ${value}`
-        )}
+            WHERE ${all(conditions, (key, value, {rawValue, escape }) =>
+                when(rawValue === null, () => (
+                    `"${relation.value}".${key} IS NULL`
+                    ),
+                    otherwiseWhen(Array.isArray(rawValue), () => (
+                        `"${relation.value}".${key} IN (${rawValue.map(escape).join(', ')})`
+                    )),
+                    otherwise(() => (
+                        `"${relation.value}".${key} = ${value}`
+                    ))
+                )
+            )}
             ORDER BY ${relation}.id ASC
         `
     }
@@ -196,6 +203,33 @@ class Model {
     }
 
 
+}
+
+
+
+
+
+const when = (condition, result, ...alternatives) => {
+   if(condition) return result()
+   else {
+       let alternative = alternatives.find(alternative => alternative.predicate == true)
+       if(alternative) return alternative.result()
+       else return null
+   }
+}
+
+const otherwiseWhen = (predicate, result) => {
+    return {
+        predicate,
+        result
+    }
+}
+
+const otherwise = (result) => {
+    return {
+        predicate: true,
+        result
+    }
 }
 
 

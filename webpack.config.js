@@ -1,9 +1,13 @@
 const path = require('path');
 const nodeExternals = require('webpack-node-externals');
-const externals = [{ 'fs': 'commonjs fs', 'child_process': 'commonjs child_process', 'http': 'commonjs http', 'triframe/core': 'commonjs triframe/core' }, nodeExternals()]
+const externals = [{ 'fs': 'commonjs fs', 'child_process': 'commonjs child_process', 'http': 'commonjs http', 'triframe/core': 'commonjs triframe/core', 'triframe/scribe': 'commonjs triframe/scribe' }, nodeExternals()]
 
 const serverConfig = {
     externals,
+    node: {
+        process: false,
+        __dirname: false
+    },
     module: {
         rules: [
             {
@@ -65,7 +69,7 @@ const clientConfig = {
                 test: /\.less$/,
                 use: [
                     'style-loader',
-                    'css-loader', 
+                    'css-loader',
                     'less-loader'
                 ] // compiles Less to CSS
             },

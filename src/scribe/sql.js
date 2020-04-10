@@ -37,8 +37,8 @@ const createReducer = seperator => (x, reducer) => literal( escape => {
     let result;
     each(x, (key, value) => 
         result = result === undefined 
-            ? reducer(toUnderscored(key), { toString: () => escape(value)}, value)
-            : `${result}${seperator}${reducer(toUnderscored(key), { toString: () => escape(value)}, value)}`
+            ? reducer(toUnderscored(key), { toString: () => escape(value)}, { rawValue: value, escape })
+            : `${result}${seperator}${reducer(toUnderscored(key), { toString: () => escape(value)}, { rawValue: value, escape })}`
     )
     return result;
 })
