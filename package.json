@@ -23,6 +23,7 @@
     "luxon": "^1.22.2",
     "mime": "^2.4.4",
     "ncp": "^2.0.0",
+    "nodegit": "^0.26.5",
     "pg": "^7.18.1",
     "react-input-slider": "^5.1.4",
     "react-native-drawer-layout": "^2.0.0",

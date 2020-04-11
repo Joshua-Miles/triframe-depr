@@ -25,8 +25,8 @@ const Main = ({ children, url = apiUrl, theme = DefaultTheme }) => {
     let [models, saveModels] = useState({ areReady: false })
     useEffect(() => {
         (async function () {
-            await fetch(`${url}/init`, { credentials: 'include' }) // <-- necessary to initialize session. This should be removed in a future release
-            let io = socketIo(url)
+            // await fetch(`${url}/init`, { credentials: 'include' }) // <-- necessary to initialize session. This should be removed in a future release
+            let io = socketIo()
             if(typeof window !== 'undefined') window.io = io
             const unserialize = createUnserializer(io)
             io.on('interface', schema => {

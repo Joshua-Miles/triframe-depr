@@ -42,7 +42,7 @@ const toTitleCase = function (str) {
 	return str;
 };
 
-module.exports = function([ type, ...args]) {
+export default function([ type, ...args]) {
     switch(type){
         case 'model':
             let decorators = {}

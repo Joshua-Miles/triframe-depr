@@ -1,7 +1,12 @@
+import newProject from './new'
+import build from './build'
+import deploy from './deploy'
+
 const program = require('commander')
 
-const newProject = require('./new')
-const build = require('./build')
+program
+    .command('deploy <name>')
+    .action( deploy )
 
 program
     .command('new <name>')

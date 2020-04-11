@@ -5,7 +5,7 @@ const path = require('path')
 const CliProgress = require('cli-progress');
 const progress = new CliProgress.Bar({}, CliProgress.Presets.shades_classic);
 
-module.exports = async function newProject(name) {
+export default async function newProject(name) {
     console.log('Starting...')
     progress.start(100, 25)
     await exec(`npx expo init "${name}" --template bare-minimum`)
