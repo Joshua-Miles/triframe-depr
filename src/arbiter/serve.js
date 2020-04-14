@@ -15,17 +15,17 @@ const expressCors = require('cors')
 const bodyParser = require('body-parser')
 const formidable = require('formidable')
 
-const getMemory = () => {
-    const { heapUsed } = process.memoryUsage()
-    return heapUsed / 1024 / 1024
-}
+// const getMemory = () => {
+//     const { heapUsed } = process.memoryUsage()
+//     return heapUsed / 1024 / 1024
+// }
 
-let initialMemory = getMemory()
-setInterval(() => {
-    const memory = getMemory()
-    console.log('Memory Usage:', `${memory.toFixed(2)} MB`)
-    console.log('Diff:', `${( initialMemory - memory).toFixed(2)} MB`)
-}, 5000)
+// let initialMemory = getMemory()
+// setInterval(() => {
+//     const memory = getMemory()
+//     console.log('Memory Usage:', `${memory.toFixed(2)} MB`)
+//     console.log('Diff:', `${( initialMemory - memory).toFixed(2)} MB`)
+// }, 5000)
 
 
 const SESSIONS_PATH = './.sessions';
