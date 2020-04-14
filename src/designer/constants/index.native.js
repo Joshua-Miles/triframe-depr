@@ -1,7 +1,8 @@
 import Constants from 'expo-constants'
 const { hostUri } = Constants.manifest
-const [ hostDomain ] = hostUri.split(':')
-const { env } = Constants.manifest.extra
-const { apiProto, apiDomain = hostDomain, apiPort } = Constants.manifest.extra[env]
-const formattedPort = apiPort && apiPort != 80 ? `:${apiPort}` : ''
-export const apiUrl = `${apiProto}://${apiDomain}${formattedPort}`
+const [ protocol, hostname ] = hostUri.split('//')
+const [ hostDomain ] = hostname.split(':')
+export const apiUrl = port => {
+    const formattedPort = port && port != 80 ? `:${port}` : ''
+    return `${protocol}://${hostDomain}${formattedPort}`
+}

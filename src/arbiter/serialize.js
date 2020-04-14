@@ -91,16 +91,12 @@ export const serialize = function ($interface, config= {}) {
                 value: isStream ? original.toString() : value.toString()
             }
         } else {
-            io.on(name, async ({ args, uid, patches, connection, send, onClose }) => {
+            io.on(name, async ({ args, uid, attributes, patches, connection, send, onClose }) => {
                 
                 connection.cache = connection.cache || createCache(connection)
 
                 const { session } = connection
-                const resource = (
-                    uid
-                        ? await connection.cache.getCached(uid)
-                        : typeof parent === 'function' ? parent : new parent.constructor
-                )
+                const resource = typeof parent === 'function' ? parent : new parent.constructor(attributes)
 
                 let { updateSuccessful, invalidPatches } = await updateResource(resource, patches, session)
 

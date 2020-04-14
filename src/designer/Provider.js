@@ -19,21 +19,25 @@ export const Provider = (props) => (
 
 let displayError;
 
-const Main = ({ children, url = apiUrl, theme = DefaultTheme }) => {
+const Main = ({ children, port = 8080, theme = DefaultTheme }) => {
     let error;
     ([error, displayError] = useState(false))
     let [models, saveModels] = useState({ areReady: false })
     useEffect(() => {
         (async function () {
-            // await fetch(`${url}/init`, { credentials: 'include' }) // <-- necessary to initialize session. This should be removed in a future release
-            let io = socketIo()
-            if(typeof window !== 'undefined') window.io = io
+            const url = apiUrl(port)
+            await fetch(`${url}/init`, { credentials: 'include' }) // <-- necessary to initialize session. This should be removed in a future release
+            let io = socketIo(url)
             const unserialize = createUnserializer(io)
             io.on('interface', schema => {
                 const api = unserialize(schema)
                 saveModels({ ...api, url })
                 if (typeof window !== 'undefined') Object.assign(window, api)
             })
+            if(typeof window !== 'undefined') window.resetSocket = () => {
+                io.disconnect()
+                io.connect()
+            }
         })()
     }, [])
     return (

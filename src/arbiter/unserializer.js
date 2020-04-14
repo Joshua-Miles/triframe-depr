@@ -85,6 +85,7 @@ export const createUnserializer = io => {
 
         const remoteProcess = function (emit, args) {
             const { uid } = this;
+            const attributes = this['[[attributes]]']
             const patches = stageNewPatches(this)
             let document;
             let emitDocument = () => emit(document)
@@ -101,7 +102,7 @@ export const createUnserializer = io => {
             }
 
             const sendRequest = () => {
-                io.emit(name, { uid, patches, args }, ({ value, hook }) => {
+                io.emit(name, { uid, patches, args, attributes }, ({ value, hook }) => {
                     emitUnserialized({value})
                     if(hook !== undefined) createSubscription(hook)
                 })

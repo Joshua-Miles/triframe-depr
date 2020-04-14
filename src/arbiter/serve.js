@@ -15,6 +15,18 @@ const expressCors = require('cors')
 const bodyParser = require('body-parser')
 const formidable = require('formidable')
 
+const getMemory = () => {
+    const { heapUsed } = process.memoryUsage()
+    return heapUsed / 1024 / 1024
+}
+
+let initialMemory = getMemory()
+setInterval(() => {
+    const memory = getMemory()
+    console.log('Memory Usage:', `${memory.toFixed(2)} MB`)
+    console.log('Diff:', `${( initialMemory - memory).toFixed(2)} MB`)
+}, 5000)
+
 
 const SESSIONS_PATH = './.sessions';
 const UPLOADS_PATH = './.uploads'
@@ -33,7 +45,7 @@ const FileStore = require('session-file-store')(session);
 const fileStore = new FileStore({ path: SESSIONS_PATH });
 const cors = (config) => expressCors(deepMerge({
     origin: function(origin, resolve) {
-        if( config.clientWhitelist.includes(origin) ){
+        if( !config.useWhiteList || config.clientWhitelist.includes(origin) ){
             resolve(null, origin)
         } else {
             resolve(null, '')
@@ -51,7 +63,7 @@ const httpRedirectMiddleware = (req, res, next) => {
 }
 
 const defaultConfig = {
-    port: process.env.PORT || 80,
+    port: process.env.BACKEND_PORT || 8080,
     models: {},
     session: {},
     database: {
@@ -67,7 +79,8 @@ const defaultConfig = {
         saveUninitialized: true
     },
     cors: {
-       clientWhitelist: []
+        useWhiteList: process.env.USE_CORS_WHITE_LIST || true,
+        clientWhitelist: process.env.CORS_WHITE_LIST || []
     }
 }
 

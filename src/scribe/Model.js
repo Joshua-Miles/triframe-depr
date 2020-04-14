@@ -43,8 +43,7 @@ class Model {
 
 
     static async create(attributes) {
-        let instance = new this
-        Object.assign(instance, attributes)
+        let instance = new this(attributes)
         await instance.persist()
         return instance
     }
