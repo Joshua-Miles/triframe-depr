@@ -116,10 +116,13 @@ export const createUnserializer = io => {
                 //  2. re-send the request to re-establish connection
                 // TODO: Worry about a server re-start causing a ton of requests, crashing
                 //  browsers and/or the server
-                io.on('reconnect', () => {
+                const reconnectHandler = () => {
+                    io.removeEventListener('reconnect', reconnectHandler)
                     io.removeEventListener(hook, emitUnserialized)
                     sendRequest()
-                })
+                }
+
+                io.on('reconnect', reconnectHandler)
 
                 // If this pipe is destroyed (user goes to another page, etc.), 
                 // tell the server to cancel the subscription and stop listening for it
