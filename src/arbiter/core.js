@@ -172,13 +172,14 @@ export const createCache = ({ socket, session }) => {
 
     const cache = resource => {
         if(bin[resource.uid]) {
-            Object.assign(bin[resource.uid]['[[attributes]]'], resource['[[attributes]]'])
+            upstreamMerge(bin[resource.uid], resource)
             return
         }
         global[resource.uid] = global[resource.uid] || []
         global[resource.uid].push({ resource, socket })
         bin[resource.uid] = resource
         socket.on(`${resource.uid}.sync`, async ({ batchId, patches }, respond) => {
+            console.log(resource)
             const { updateSuccessful, invalidPatches } = await updateResource(resource, patches, session)
             respond({ updateSuccessful, invalidPatches })
             resource.emit('Δ.sync', new SyncEvent({ resource, batchId, socket }))
