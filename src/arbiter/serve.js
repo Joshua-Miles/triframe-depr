@@ -3,7 +3,6 @@ import { createSession } from './createSession'
 import { deepMerge } from 'triframe/core'
 import { connect } from 'triframe/scribe'
 
-import request from 'request'
 import fs from 'fs'
 import mime from 'mime';
 
