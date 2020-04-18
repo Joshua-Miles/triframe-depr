@@ -5,6 +5,7 @@ import { connect } from 'triframe/scribe'
 
 import fs from 'fs'
 import mime from 'mime';
+import ncp from 'ncp'
 
 const path= require('path')
 const express= require('express')
@@ -145,9 +146,7 @@ const cdnUploadHandler = (req, res) => {
             const extension = file.name.split('.').pop()
             const filepath = `${createToken()}.${extension}`
             urls.push(`/cdn/${filepath}`)
-            fs.rename(file.path, `${UPLOADS_PATH}/${filepath}`, function (err) {
-                if (err) throw err;
-            });
+            ncp(file.path, `${UPLOADS_PATH}/${filepath}`);
         })
         // res.writeHead(200, { 'content-type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
         res.end(JSON.stringify(urls));
