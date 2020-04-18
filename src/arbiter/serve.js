@@ -3,6 +3,7 @@ import { createSession } from './createSession'
 import { deepMerge } from 'triframe/core'
 import { connect } from 'triframe/scribe'
 
+import request from 'request'
 import fs from 'fs'
 import mime from 'mime';
 
@@ -27,9 +28,9 @@ const formidable = require('formidable')
 //     console.log('Diff:', `${( initialMemory - memory).toFixed(2)} MB`)
 // }, 5000)
 
-
-const SESSIONS_PATH = './.sessions';
-const UPLOADS_PATH = './.uploads'
+const STORAGE_PATH = './.storage';
+const SESSIONS_PATH = `${STORAGE_PATH}/sessions`;
+const UPLOADS_PATH = `${STORAGE_PATH}/uploads`
 
 
 if (!fs.existsSync(SESSIONS_PATH)) {
@@ -196,6 +197,8 @@ const createToken = () => {
     }
     return result;
 }
+
+
 
 function loadModels(r) {
     const models = {}
