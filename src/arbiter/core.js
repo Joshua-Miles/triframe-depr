@@ -50,8 +50,12 @@ export const initializeResource = (resource, attributes = {}) => {
     resource.on('Δ.sync', ({ socket, patches, batchId, resource : what }) => {
         if(global[resource.uid]) global[resource.uid].forEach(({ socket: otherSocket, resource }) => {
             if (socket != otherSocket) {
-                mergePatches(resource, patches)
-                otherSocket.emit(`${resource.uid}.mergePatches`, patches)
+                try{
+                    mergePatches(resource, patches)
+                    otherSocket.emit(`${resource.uid}.mergePatches`, patches)
+                } catch(err){
+                    // ?
+                }
             }
         })
         if(socket) socket.emit(`${resource.uid}.mergeBatch`, batchId)
@@ -166,9 +170,10 @@ const subscribeToChildEvents = (resource, attributes, namespace = false) => {
 
 const global = {}
 
-export const createCache = ({ socket, session }) => {
+export const createCache = (connection) => {
 
     const bin = {}
+    const { session }= connection
 
     const cache = resource => {
         if(bin[resource.uid]) {
@@ -176,13 +181,14 @@ export const createCache = ({ socket, session }) => {
             return
         }
         global[resource.uid] = global[resource.uid] || []
-        global[resource.uid].push({ resource, socket })
+        global[resource.uid].push({ resource, get socket(){ return connection.socket} })
+    
         bin[resource.uid] = resource
-        socket.on(`${resource.uid}.sync`, async ({ batchId, patches }, respond) => {
+        connection.socket.on(`${resource.uid}.sync`, async ({ batchId, patches, attributes, respond }) => {
             console.log(resource)
             const { updateSuccessful, invalidPatches } = await updateResource(resource, patches, session)
             respond({ updateSuccessful, invalidPatches })
-            resource.emit('Δ.sync', new SyncEvent({ resource, batchId, socket }))
+            resource.emit('Δ.sync', new SyncEvent({ resource, batchId, socket: connection.socket }))
         })
     }
 

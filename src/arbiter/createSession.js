@@ -18,6 +18,10 @@ export const createSession = (model) => {
                 this['[[pipes]]'] = pipes
             }
 
+            get id(){
+                return this['[[attributes]]'].id
+            }
+
             onChange(callback){
                 this['[[callback]]'] = (session) => {
                     if(session !== this){

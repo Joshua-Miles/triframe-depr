@@ -1,6 +1,6 @@
 import { serialize } from './serialize'
 import { createSession } from './createSession'
-import { deepMerge } from 'triframe/core'
+import { deepMerge, EventEmitter } from 'triframe/core'
 import { connect } from 'triframe/scribe'
 
 import fs from 'fs'
@@ -153,10 +153,37 @@ const cdnUploadHandler = (req, res) => {
     });
 }
 
+let bin = {}
+
 const createSocketHandler = (apiSchema, Session) => socket => {
     const session = new Session(socket.request.session)
     let requestId = 0;
-    const connection = { socket, session }
+    let internal
+    if(!bin[session.id]){
+        internal = new EventEmitter
+        bin[session.id] =  { internal, sockets: [ socket.id ] }
+        socket.use(([event, payload, respond], next) => {
+            payload.respond = respond
+            internal.emit(event, payload)
+            next()
+        })
+        internal.on('*', (payload, event) => {
+            socket.emit(event, payload)
+        })
+    } else if (!bin[session.id].sockets.includes(socket.id)){
+        bin[session.id].sockets.push(socket.id)
+        internal = bin[session.id].internal
+        socket.use(([event, payload, respond], next) => {
+            payload.respond = respond
+            internal.emit(event, payload)
+            next()
+        })
+        internal.on('*', (payload, event) => {
+            socket.emit(event, payload)
+        })
+    }
+
+    const connection = { get socket(){ return internal }, session }
     socket.use(([event, payload, respond], next) => {
         let closeHandler = () => null
         let hasResponded = false
@@ -172,12 +199,12 @@ const createSocketHandler = (apiSchema, Session) => socket => {
                     respond({ value })
                 }
             } else {
-                socket.emit(hook, { value })
+                internal.emit(hook, { value })
             }
         }
         let onClose = callback => closeHandler = callback
         apiSchema.emit(event, { ...payload, connection, send, onClose })
-        socket.on('disconnect', () => closeHandler())
+        // socket.on('disconnect', () => closeHandler())
         next()
     })
     socket.emit('interface', apiSchema)
