@@ -163,13 +163,11 @@ const createSocketHandler = (apiSchema, Session) => socket => {
         internal = new EventEmitter
         bin[session.id] =  { internal, sockets: [ socket.id ] }
         socket.use(([event, payload, respond], next) => {
-            payload.respond = respond
-            payload[marker] = true
-            internal.emit(event, payload)
+            internal.emit(event, { ...payload, respond, [marker]: true })
             next()
         })
         internal.on('*', (payload, event) => {
-            if(!payload[marker]) socket.emit(event, payload)
+            if(!payload || !payload[marker]) socket.emit(event, payload)
         })
     } else if (!bin[session.id].sockets.includes(socket.id)){
         bin[session.id].sockets.push(socket.id)
