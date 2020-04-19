@@ -173,8 +173,7 @@ const createSocketHandler = (apiSchema, Session) => socket => {
         bin[session.id].sockets.push(socket.id)
         internal = bin[session.id].internal
         socket.use(([event, payload, respond], next) => {
-            payload.respond = respond
-            internal.emit(event, payload)
+            internal.emit(event, { ...payload, respond, [marker]: true })
             next()
         })
         internal.on('*', (payload, event) => {
