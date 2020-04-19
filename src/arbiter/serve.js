@@ -154,7 +154,7 @@ const cdnUploadHandler = (req, res) => {
 }
 
 let bin = {}
-
+let marker = Symbol()
 const createSocketHandler = (apiSchema, Session) => socket => {
     const session = new Session(socket.request.session)
     let requestId = 0;
@@ -164,11 +164,12 @@ const createSocketHandler = (apiSchema, Session) => socket => {
         bin[session.id] =  { internal, sockets: [ socket.id ] }
         socket.use(([event, payload, respond], next) => {
             payload.respond = respond
+            payload[marker] = true
             internal.emit(event, payload)
             next()
         })
         internal.on('*', (payload, event) => {
-            socket.emit(event, payload)
+            if(!payload[marker]) socket.emit(event, payload)
         })
     } else if (!bin[session.id].sockets.includes(socket.id)){
         bin[session.id].sockets.push(socket.id)
