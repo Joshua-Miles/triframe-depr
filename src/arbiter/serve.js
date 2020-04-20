@@ -7,8 +7,8 @@ import fs from 'fs'
 import mime from 'mime';
 import ncp from 'ncp'
 
-const path= require('path')
-const express= require('express')
+const path = require('path')
+const express = require('express')
 const app = express();
 const server = require('http').Server(app);
 const io = require('socket.io')(server, { serveClient: false });
@@ -45,8 +45,8 @@ const session = require('express-session');
 const FileStore = require('session-file-store')(session);
 const fileStore = new FileStore({ path: SESSIONS_PATH });
 const cors = (config) => expressCors(deepMerge({
-    origin: function(origin, resolve) {
-        if( !config.useWhiteList || config.clientWhitelist.includes(origin) ){
+    origin: function (origin, resolve) {
+        if (!config.useWhiteList || config.clientWhitelist.includes(origin)) {
             resolve(null, origin)
         } else {
             resolve(null, '')
@@ -69,7 +69,7 @@ const defaultConfig = {
     session: {},
     database: {
         user: process.env.DB_USER || 'Josephine',
-        password: process.env.DB_PASSWORD ||  'P00p!',
+        password: process.env.DB_PASSWORD || 'P00p!',
         database: process.env.DB_NAME || 'Josephine',
         port: process.env.DB_PORT || 5432
     },
@@ -106,7 +106,7 @@ export async function serve(configArgument) {
     app.use(bodyParserMiddleware)
     app.use(corsMiddleware)
     app.use(express.static(path.resolve('./public')))
-    app.get('/init', (req, res) => res.json({ ok: true }) )
+    app.get('/init', (req, res) => res.json({ ok: true }))
     app.post('/upload', cdnUploadHandler)
     app.get('/cdn*', cdnHandler)
     app.get('/*', frontendHandler)
@@ -153,36 +153,43 @@ const cdnUploadHandler = (req, res) => {
     });
 }
 
-let bin = {}
-let marker = Symbol()
+let connections = {}
+
 const createSocketHandler = (apiSchema, Session) => socket => {
-    const session = new Session(socket.request.session)
-    let requestId = 0;
-    let internal
-    if(!bin[session.id]){
-        internal = new EventEmitter
-        bin[session.id] =  { internal, sockets: [ socket.id ] }
+
+    let connection;
+
+    socket.on('initialize', (respond) => {
+        let agent = new EventEmitter
+        let session = new Session(socket.request.session)
+        let requestId = 0;
+        let id = createToken()
+        bindAgent(agent)
+        connection = { socket: agent, session, requestId, id }
+        connections[id] = connection
+        respond({ apiSchema, id })
+    })
+
+    socket.on('connect-id', (id) => {
+        connection = connections[id]
+        bindAgent(connection.socket)
+    })
+
+
+    let bindAgent = (agent) => {
         socket.use(([event, payload, respond], next) => {
-            internal.emit(event, { ...payload, respond, [marker]: true })
+            agent.emit(event, { ...payload, respond })
             next()
         })
-        internal.on('*', (payload, event) => {
-            if(!payload || !payload[marker]) socket.emit(event, payload)
-        })
-    } else if (!bin[session.id].sockets.includes(socket.id)){
-        bin[session.id].sockets.push(socket.id)
-        internal = bin[session.id].internal
-        socket.use(([event, payload, respond], next) => {
-            internal.emit(event, { ...payload, respond, [marker]: true })
-            next()
-        })
-        internal.on('*', (payload, event) => {
+        agent.on('*', (payload, event) => {
             socket.emit(event, payload)
         })
     }
 
-    const connection = { get socket(){ return internal }, session }
+    // const connection = { get socket(){ return internal }, session }
     socket.use(([event, payload, respond], next) => {
+        if(!connection) return next();
+        let { socket } = connection
         let closeHandler = () => null
         let hasResponded = false
         let hook = false;
@@ -190,22 +197,21 @@ const createSocketHandler = (apiSchema, Session) => socket => {
             if (!hasResponded) {
                 hasResponded = true
                 if (keepOpen) {
-                    hook = `${requestId++}: ${event}`
+                    hook = `${connection.requestId++}: ${event}`
                     socket.on(`${hook}.destroy`, () => closeHandler())
                     respond({ value, hook })
                 } else {
                     respond({ value })
                 }
             } else {
-                internal.emit(hook, { value })
+                socket.emit(hook, { value })
             }
         }
         let onClose = callback => closeHandler = callback
         apiSchema.emit(event, { ...payload, connection, send, onClose })
-        // socket.on('disconnect', () => closeHandler())
         next()
     })
-    socket.emit('interface', apiSchema)
+    
 }
 
 
@@ -226,7 +232,7 @@ const createToken = () => {
 function loadModels(r) {
     const models = {}
     r.keys().forEach(key => {
-        if(key.includes('__')) return
+        if (key.includes('__')) return
         let path = key.replace('.js', '').split('/')
         let Model = path.pop()
         let module = r(key)

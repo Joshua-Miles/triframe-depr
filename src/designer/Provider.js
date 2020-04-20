@@ -29,10 +29,13 @@ const Main = ({ children, port = 8080, theme = DefaultTheme }) => {
             await fetch(`${url}/init`, { credentials: 'include' }) // <-- necessary to initialize session. This should be removed in a future release
             let io = socketIo(url)
             const unserialize = createUnserializer(io)
-            io.on('interface', schema => {
-                const api = unserialize(schema)
+            io.emit('initialize', ({ apiSchema, id }) => {
+                const api = unserialize(apiSchema)
                 saveModels({ ...api, url })
                 if (typeof window !== 'undefined') Object.assign(window, api)
+                io.on('reconnect', () => {
+                    io.emit('connect-id', id)
+                })
             })
             if(typeof window !== 'undefined') window.resetSocket = () => {
                 io.disconnect()
