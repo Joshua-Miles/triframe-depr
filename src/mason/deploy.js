@@ -9,22 +9,20 @@ const express = require('express')
 const bodyParser = require('body-parser')
 const { Octokit } = require("@octokit/rest");
 const { Repository, Reference, Signature, Remote, Cred } = require("nodegit")
+const readline = require("readline");
 
 const STATE_STORAGE = '.triframe'
 const GOOGLE_CLIENT_ID = '1009774431187-m11c1cekqfsnt48pb7cl25d13kq15sj3.apps.googleusercontent.com'
 
 const BASE_DISK_NAME = 'triframe-base'
-
+const GIT_DIST_BRANCH = 'distribution'
 
 const userName = 'joshua-miles'
-const personalAccessToken = `65dd359783bf161f13d1ec31c515b0e92e9369cc`
-const projectName = 'spiral'
-const repoName = projectName
 const gcProjectName = 'spiral-app'
 const gcRegion = 'us-central1'
 
 
-let octokit, gccOAuthToken;
+let octokit, gccOAuthToken, gcProjectNumber, projectName, gitPersonalAccessToken;
 
 export default async (name) => {
 
@@ -33,20 +31,27 @@ export default async (name) => {
     let duplicate = await findDuplicate(name)
 
     if (duplicate) throw Error(`Duplicate Deployment name "${name}", please pick a different name`)
+ 
+    ; ({ gitPersonalAccessToken, projectName } = await getState())
+
+    if (!gitPersonalAccessToken) gitPersonalAccessToken = await askForPersonalAccessToken()
+    if (!projectName) projectName = await askForProjectName()
 
     octokit = new Octokit({
-        auth: personalAccessToken
+        auth: gitPersonalAccessToken
     });
 
     const repository = await openRepository()
 
     await buildProject()
 
-    await repository.checkoutBranch('production')
+    await repository.checkoutBranch(GIT_DIST_BRANCH)
 
     await formatDistribution()
 
-    await addCommitAndPush(repository, name)
+    try {
+        await addCommitAndPush(repository, name)
+    }catch(err){}
 
     const release = await createRelease(name)
 
@@ -59,6 +64,35 @@ export default async (name) => {
     await repository.checkoutBranch('master')
 
     console.log('Deployment Complete')
+}
+
+const askForPersonalAccessToken = () => {
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
+    return new Promise(resolve => {
+        rl.question("Enter your GitHub Personal Access Token:", async (gitPersonalAccessToken) => {
+            await saveState({ gitPersonalAccessToken })
+            resolve(gitPersonalAccessToken)
+            rl.close();
+        });
+    })
+}
+
+
+const askForProjectName = () => {
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
+    return new Promise(resolve => {
+        rl.question("Enter a name for this project:", async (projectName) => {
+            await saveState({ projectName })
+            resolve(projectName)
+            rl.close();
+        });
+    })
 }
 
 const rmDir = function (path) {
@@ -92,6 +126,7 @@ const sendRequest = ({ method, url, body, headers }) => {
                 gccOAuthToken = await getGoogleCredentials()
                 return sendRequest({ method, url, body, headers })
             } else {
+                console.log(result.error)
                 let error = new Error(result.error.message);
                 Object.assign(error, result.error)
                 throw error
@@ -152,22 +187,21 @@ const formatDistribution = async () => {
     await ncp('./dist/index.js', './index.js')
     await sleep(3000)
     await rmDir('./web-build')
-    await rmDir('./dist')
 }
 
 const addCommitAndPush = async (repository, name) => {
     await exec('git add ./public')
     await exec('git add ./index.js')
     await exec(`git commit -m "Build for Deployment ${name}"`)
-    await exec('git push origin production')
+    await exec(`git push origin ${GIT_DIST_BRANCH}`)
 }
 
 const createRelease = async (name) => {
     return await octokit.repos.createRelease({
         name: name,
         tag_name: `deployment@${name}`,
-        repo: repoName,
-        target_commitish: 'production',
+        repo: projectName,
+        target_commitish: GIT_DIST_BRANCH,
         owner: userName
     })
 }
@@ -203,8 +237,11 @@ const createOrUpdateInstanceGroup = async name => {
 
 const createInstanceTemplate = async (tarball_url, name) => {
     name = `${projectName}-${name.replace(/\./g, '-')}`
+    await findOrCreateProject()
     await findOrCreateDisk()
     await findOrCreateBucket()
+    // await findOrCreateDatabase
+    // await findOrCreateLoadBalancer
     const { gcBucketName } = await getState()
     console.log('Creating Instance Template...')
     const operation = await post(`https://compute.googleapis.com/compute/v1/projects/${gcProjectName}/global/instanceTemplates`, {
@@ -276,11 +313,45 @@ const createInstanceTemplate = async (tarball_url, name) => {
                 "enableSecureBoot": false,
                 "enableVtpm": true,
                 "enableIntegrityMonitoring": true
-            }
+            },
+            "serviceAccounts": [
+                {
+                    "email": `${gcProjectNumber}-compute@developer.gserviceaccount.com`,
+                    "scopes": [
+                        "https://www.googleapis.com/auth/devstorage.full_control",
+                        "https://www.googleapis.com/auth/logging.write",
+                        "https://www.googleapis.com/auth/monitoring.write",
+                        "https://www.googleapis.com/auth/servicecontrol",
+                        "https://www.googleapis.com/auth/service.management.readonly",
+                        "https://www.googleapis.com/auth/trace.append",
+                        "https://www.googleapis.com/auth/trace.append",
+                        'https://www.googleapis.com/auth/sqlservice.admin'
+                    ]
+                }
+            ]
         }
     })
     await completionOf(operation)
     console.log('Created Instance Template')
+}
+
+
+
+const findOrCreateProject = async () => {
+    try {
+        let project = await get(`https://cloudresourcemanager.googleapis.com/v1/projects/${gcProjectName}`)
+        gcProjectNumber = project.projectNumber
+    } catch (err){
+        console.error('You haven\'t built this yet :(')
+        // await createProject(name)
+    }
+}
+
+const createProject = async (name) => {
+    // TODO: Finish this
+    await post(`https://cloudresourcemanager.googleapis.com/v1/projects`, {
+        name
+    })
 }
 
 const findOrCreateDisk = async () => {
@@ -293,7 +364,7 @@ const findOrCreateDisk = async () => {
 
 const findOrCreateBucket = async () => {
     const { gcBucketName } = await getState()
-    if(gcBucketName === undefined) return createBucket()
+    if (gcBucketName === undefined) return createBucket()
     let result = await get(`https://storage.googleapis.com/storage/v1/b?project=${gcProjectName}`)
     const buckets = result.items || []
     const bucket = buckets.find(bucket => bucket.name === gcBucketName)
@@ -308,7 +379,7 @@ const createBucket = async (name = `${projectName}-bucket`) => {
         })
         await saveState({ gcBucketName: response.name })
         return response
-    } catch(err){
+    } catch (err) {
         console.log('Bucket Creation Failed...')
         return await createBucket(`${name}-${createToken()}`)
     }
@@ -482,7 +553,7 @@ const getState = async () => {
 
 const saveState = async (state) => {
     state = { ...await getState(), ...state }
-    return fs.writeFile(Path.resolve(STATE_STORAGE), JSON.stringify(state))
+    return fs.writeFile(Path.resolve(STATE_STORAGE), JSON.stringify(state, null, 2))
 }
 
 const diskStartUpScript = `
@@ -503,12 +574,16 @@ chmod 500 /etc/authbind/byport/443
 chown isaacsmiles /etc/authbind/byport/443
 wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
 chmod +x cloud_sql_proxy
-printf '{"type":"service_account","project_id":"spiral-app","private_key_id":"cdf0aabc6ca6d16ee324a02b2fc980f1b66c613e","private_key":"-----BEGIN PRIVATE KEY-----\\\\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDnMN/ljTK6I9LJ\\\\nS3TSuCQkMU23m3aEuC1n3GDsxjCLC2RkUI3tZytFhjK1N2SMO7tMUfCobDnzDoYj\\\\nEAz5dfAbERPDJkGIhkabfElez758KvG0nfusT0zvb5bn4TsBkj+tAC+ZEf/S5KQ5\\\\niUT0kg8M2arczPLvlBFkWLJGsgRIUimvlzLij9BydZSPaQrVMkhrmbLOOkm6Ockn\\\\nFPmF31KM/2iuzYco+YZLd3NREKVqZtu59cPCJ95RNSfSDoAhvTLYSTx5LcGgn+1N\\\\nZFfYuD7dGq38ifM4HOVfksuBbvfnisewih2EVPm+E25a8XjPAmrfDbXBU1ivMUYY\\\\nIC+TslLVAgMBAAECggEACZYEnDXX/GqpCwDejcoy1wlWtp4MmQFmAi0O6JWcxHcr\\\\nD3nDmMXMjOwJxQSdKuKWW1pebZPA1CvHzHZi6bxF9QLzqQWe3AFTtii+H6wV5hVS\\\\nj/GpBZw4JwlsEWtMxHDpXcwCYG9w0xbF56WiC7eh37khLr/H8768LEcwa5WZoqhc\\\\ngjYwcBk4Z8UQvBJPiSbngin0I4Fo44m//VGOg7nlHQAIfDnfOWdzXBFMPYhoUDPu\\\\nujOtButAZ/5VC7cOd3EH/3wyY/zbRTrmZxikZc2kDgePgERiRtYw8FtNQvjN9gcU\\\\niuajcU47B2nBXxlvw/DCPi0yxSiTUBhrtKxSrjrxgQKBgQD4g4ixHKq08DWAc4xz\\\\nTAkNOlKF6gB8daxg3yZDIr7WvRHsR19e54du3Q/EvPqMVyT1mqhtGz9MzgyUz2qq\\\\nJQy5xMHJp2X4PxEsm5n6cm3tpxySMeHzLQHaWjdKAwR4zzlLKMWXF48KN1HuHt79\\\\nJvOWn6sbtaFXvf0ze/JrNCFHNQKBgQDuJ8BncXESS9RLi+1I7EhaDGsKPIDVwFtC\\\\nC4gUV5hP5whO6jt4ATUy92pPQZfzEiQ2Erc01Pf4EAYNiErPtB8Rron3VV2Dz1md\\\\n0bQt88lhDM22EESKfTQfmc5ctUuQoii8KPV2Psr9yQq4eLQZg1fI/IgQUW7YgGfG\\\\nFfLt54sxIQKBgDzQw5TENSpOVml23Xohs11fVm6bEz9h9KtIMK7hQ959KnOuC7LH\\\\n6ibBRmiY7p+Fe+/2xxzcPCNpkT6he7Ljmjej5OCabKPRmzxVX9sgQbKU4LMOLgM6\\\\nkmeDCGC+WEvQOm8gLSqKg2C2pQAm4d8Ftzq3HEKNskwsnFgLDwoZGcO5AoGBAJ06\\\\na0Ef2NmObHrvx1kkfWPN3QEmDpyP4O/Kcy2S4wClc4u+AkLo8TlTtMDcejfEm1mD\\\\no6Zij88arRRUDafwr65Zv8Ylepah1vVlVAIed6316P2w4b9Yh4fxYBc+rcOv+xq2\\\\nI8/MBvHjv4soTSam2tbbOe0kBf0zUM+q//XmrrNhAoGBAPUHOWG74oZcmF3AcyOG\\\\n31G7X7gPY7Q4LecIY8czDWcVoK9CHUa/C9dBi2izC9IyTNEV+ETVdplFrANSwj1w\\\\nsnmF7ayj4nEW7ZsNPvizUr1DB1qkzPn8LwMJKIpkXW3nR41nhPMLUvwdeAP3nWJP\\\\n7YydmTUbHLNjSmiNQ6jOutOV\\\\n-----END PRIVATE KEY-----\\\\n","client_email":"1067453211142-compute@developer.gserviceaccount.com","client_id":"113525226759410066844","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs","client_x509_cert_url":"https://www.googleapis.com/robot/v1/metadata/x509/1067453211142-compute%40developer.gserviceaccount.com"}' > keyfile.json
-./cloud_sql_proxy -instances=spiral-app:us-central1:spiral-db=tcp:5432 -credential_file=./keyfile.json &
-curl -L -u '${userName}:${personalAccessToken}' '${tarball_url}' | tar xzf - --one-top-level="${projectName}" --strip-components 1
+./cloud_sql_proxy -instances=spiral-app:us-central1:spiral-db=tcp:5432 &
+curl -L -u '${userName}:${gitPersonalAccessToken}' '${tarball_url}' | tar xzf - --one-top-level="${projectName}" --strip-components 1
 cd ${projectName}
 mkdir ./.storage
-GOOGLE_APPLICATION_CREDENTIALS=~/keyfile.json gcsfuse ${gcBucketName} ./.storage
+export GCSFUSE_REPO=gcsfuse-\`lsb_release -c -s\`
+echo "deb http://packages.cloud.google.com/apt $GCSFUSE_REPO main" | sudo tee /etc/apt/sources.list.d/gcsfuse.list
+curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+sudo apt-get update
+sudo apt-get install gcsfuse
+gcsfuse ${gcBucketName} ./.storage
 npm install --only=production
 export DB_HOST="127.0.0.1"
 export DB_PORT="5432"

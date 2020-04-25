@@ -2,6 +2,7 @@ import { serialize } from './serialize'
 import { createSession } from './createSession'
 import { deepMerge, EventEmitter } from 'triframe/core'
 import { connect } from 'triframe/scribe'
+import { Connection } from './Connection'
 
 import fs from 'fs'
 import mime from 'mime';
@@ -11,7 +12,7 @@ const path = require('path')
 const express = require('express')
 const app = express();
 const server = require('http').Server(app);
-const io = require('socket.io')(server, { serveClient: false });
+// const io = require('socket.io')(server, { serveClient: false });
 const expressCors = require('cors')
 const bodyParser = require('body-parser')
 const formidable = require('formidable')
@@ -97,9 +98,8 @@ export async function serve(configArgument) {
     const bodyParserMiddleware = bodyParser()
     const sessionMiddleware = session(config.sessionStorage)
 
-    const Session = createSession(config.session)
     const apiSchema = serialize(models)
-    const socketHandler = createSocketHandler(apiSchema, Session)
+    const socketHandler = createSocketHandler(apiSchema)
 
     app.use(httpRedirectMiddleware)
     app.use(sessionMiddleware);
@@ -111,8 +111,8 @@ export async function serve(configArgument) {
     app.get('/cdn*', cdnHandler)
     app.get('/*', frontendHandler)
 
-    io.use((socket, next) => sessionMiddleware(socket.request, socket.request.res, next));
-    io.on('connection', socketHandler)
+    Connection.listen(server, config.session, socketHandler)
+
 
     server.listen(config.port)
     console.log(`Listening on ${config.port}`)
@@ -153,64 +153,39 @@ const cdnUploadHandler = (req, res) => {
     });
 }
 
-let connections = {}
+const createSocketHandler = (apiSchema) => socket => {
 
-const createSocketHandler = (apiSchema, Session) => socket => {
-
-    let connection;
-
-    socket.on('initialize', (respond) => {
-        let agent = new EventEmitter
-        let session = new Session(socket.request.session)
-        let requestId = 0;
-        let id = createToken()
-        bindAgent(agent)
-        connection = { socket: agent, session, requestId, id }
-        connections[id] = connection
-        respond({ apiSchema, id })
+    socket.on('*', (payload, send, event) => {
+        apiSchema.emit(event, { ...payload, socket, send,  /*onClose*/ })
     })
 
-    socket.on('connect-id', (id) => {
-        connection = connections[id]
-        bindAgent(connection.socket)
-    })
+    socket.emit('install', apiSchema)
 
-
-    let bindAgent = (agent) => {
-        socket.use(([event, payload, respond], next) => {
-            agent.emit(event, { ...payload, respond })
-            next()
-        })
-        agent.on('*', (payload, event) => {
-            socket.emit(event, payload)
-        })
-    }
-
-    // const connection = { get socket(){ return internal }, session }
-    socket.use(([event, payload, respond], next) => {
-        if(!connection) return next();
-        let { socket } = connection
-        let closeHandler = () => null
-        let hasResponded = false
-        let hook = false;
-        let send = (value, keepOpen) => {
-            if (!hasResponded) {
-                hasResponded = true
-                if (keepOpen) {
-                    hook = `${connection.requestId++}: ${event}`
-                    socket.on(`${hook}.destroy`, () => closeHandler())
-                    respond({ value, hook })
-                } else {
-                    respond({ value })
-                }
-            } else {
-                socket.emit(hook, { value })
-            }
-        }
-        let onClose = callback => closeHandler = callback
-        apiSchema.emit(event, { ...payload, connection, send, onClose })
-        next()
-    })
+    // socket.use(([event, payload, respond], next) => {
+    //     if(!connection) return next();
+    //     let { socket } = connection
+    //     let closeHandler = () => null
+    //     let hasResponded = false
+    //     let hook = false;
+    //     let send = (value, keepOpen) => {
+    //         if (!hasResponded) {
+    //             hasResponded = true
+    //             if (keepOpen) {
+    //                 hook = `${connection.requestId++}: ${event}`
+    //                 socket.on(`${hook}.destroy`, () => closeHandler())
+    //                 respond({ value, hook })
+    //             } else {
+    //                 respond({ value })
+    //             }
+    //         } else {
+    //             socket.emit(hook, { value })
+    //         }
+    //     }
+    //     let onClose = callback => closeHandler = callback
+    //     // THIS SHIT:
+    //     apiSchema.emit(event, { ...payload, connection, send, onClose })
+    //     next()
+    // })
     
 }
 

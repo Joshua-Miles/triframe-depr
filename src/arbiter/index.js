@@ -4,4 +4,5 @@ import { serialize } from "./serialize";
 import { createUnserializer } from "./unserializer";
 import { serve } from "./serve";
 import { getPatchesFor, archivePatchesFor } from "./core";
-export { Resource, List, serialize, createUnserializer, serve, getPatchesFor, archivePatchesFor }
+import { Connection } from './Connection'
+export { Resource, List, serialize, createUnserializer, serve, getPatchesFor, archivePatchesFor, Connection }

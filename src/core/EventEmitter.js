@@ -69,11 +69,11 @@ export class EventEmitter {
         return stream;
     }
 
-    emit(event, payload, metadata={}){
+    emit(event, ...args){
         return Promise.all(this[bin].map( (node) => {
             if(this.matches( node.predicate, event)){ 
                 return new Promise( resolve => {
-                    let promise = node.callback(payload, event, metadata)
+                    let promise = node.callback(...args, event)
                     if(promise && promise.then) promise.then(resolve)
                     else resolve()
                 })
@@ -104,20 +104,21 @@ export class EventEmitter {
         return stream
     }
 
-    of(namespace){
-        if(this[submodules][namespace]) return this[submodules][namespace]
-        let newEmitter = this[submodules][namespace] = new EventEmitter 
-        const proxyMarker = Symbol()
-        this.on(`${namespace}.*`, (payload, event, metadata) => {
-            if(metadata[proxyMarker]) return 
-            let newEvent = event.replace(`${namespace}.`, '')
-            newEmitter.emit(newEvent, payload)
-        })
-        newEmitter.on('*', (payload, event) => {
-            this.emit(`${namespace}.${event}`, payload, { [proxyMarker]: true })
-        })
-        return newEmitter
-    }
+    // of(namespace){
+    //     if(this[submodules][namespace]) return this[submodules][namespace]
+    //     let newEmitter = this[submodules][namespace] = new EventEmitter 
+    //     const proxyMarker = Symbol()
+    //     this.on(`${namespace}.*`, (payload, ...args) => {
+    //         let event = args.pop()
+    //         if(metadata[proxyMarker]) return 
+    //         let newEvent = event.replace(`${namespace}.`, '')
+    //         newEmitter.emit(newEvent, payload)
+    //     })
+    //     newEmitter.on('*', (...args, event) => {
+    //         this.emit(`${namespace}.${event}`, payload, { [proxyMarker]: true })
+    //     })
+    //     return newEmitter
+    // }
 
     matches(predicate, event){
         if(event === predicate) return true

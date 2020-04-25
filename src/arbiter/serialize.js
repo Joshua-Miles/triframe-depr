@@ -91,11 +91,11 @@ export const serialize = function ($interface, config= {}) {
                 value: isStream ? original.toString() : value.toString()
             }
         } else {
-            io.on(name, async ({ args, uid, attributes, patches, connection, send, onClose }) => {
+            io.on(name, async ({ args, uid, attributes, patches, socket, send, onClose }) => {
                 
-                connection.cache = connection.cache || createCache(connection)
+                socket.cache = socket.cache || createCache(socket)
 
-                const { session } = connection
+                const { session } = socket
                 const resource = typeof parent === 'function' ? parent : new parent.constructor(attributes)
 
                 let { updateSuccessful, invalidPatches } = await updateResource(resource, patches, session)
@@ -108,11 +108,11 @@ export const serialize = function ($interface, config= {}) {
                     return send({ error: true, message: 'You are not authorized to call this method' })
                 }
                 
-                let result, methodSession, accessSession = connection.session.createSlice();
+                let result, methodSession, accessSession = socket.session.createSlice();
 
                 const sendSerialized = async (value, keepOpen) => {
-                    if (usesSession) methodSession.save()
-                    const cache = connection.cache
+                    // if (usesSession) methodSession.save()
+                    const cache = socket.cache
                     const session = accessSession
                     const callback = () => sendSerialized(value, keepOpen)
                     let serialized = await serializeDocument(value, { cache, session, callback })
@@ -120,7 +120,7 @@ export const serialize = function ($interface, config= {}) {
                 }
 
                 if (usesSession) {
-                    methodSession = connection.session.createSlice()
+                    methodSession = socket.session.createSlice()
                     args.unshift(methodSession)
                     methodSession.onChange(() => run())
                 }
@@ -135,11 +135,11 @@ export const serialize = function ($interface, config= {}) {
                     if (result && result.catch) result.catch(err => send({ error: true, message: err.message }))
                     if (isPipe(result)) {
                         result.observe(value => sendSerialized(value, true))
-                        onClose(() => {
-                            result.destroy()
-                            if(methodSession) methodSession.removeListeners()
-                            if(accessSession) accessSession.removeListeners()
-                        })
+                        // onClose(() => {
+                        //     result.destroy()
+                        //     if(methodSession) methodSession.removeListeners()
+                        //     if(accessSession) accessSession.removeListeners()
+                        // })
                     } else if (isPromise(result)) {
                         result.then(value => sendSerialized(value))
                     } else {

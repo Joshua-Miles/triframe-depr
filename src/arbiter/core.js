@@ -171,10 +171,10 @@ const subscribeToChildEvents = (resource, attributes, namespace = false) => {
 
 const global = {}
 
-export const createCache = (connection) => {
+export const createCache = (socket) => {
 
     const bin = {}
-    const { session }= connection
+    const { session }= socket
 
     const cache = resource => {
         if(bin[resource.uid]) {
@@ -182,14 +182,13 @@ export const createCache = (connection) => {
             return
         }
         global[resource.uid] = global[resource.uid] || []
-        global[resource.uid].push({ resource, get socket(){ return connection.socket} })
+        global[resource.uid].push({ resource, socket })
     
         bin[resource.uid] = resource
-        connection.socket.on(`${resource.uid}.sync`, async ({ batchId, patches, attributes, respond }) => {
-            console.log(resource)
+        socket.on(`${resource.uid}.sync`, async ({ batchId, patches, attributes }, respond) => {
             const { updateSuccessful, invalidPatches } = await updateResource(resource, patches, session)
             respond({ updateSuccessful, invalidPatches })
-            resource.emit('Δ.sync', new SyncEvent({ resource, batchId, socket: connection.socket }))
+            resource.emit('Δ.sync', new SyncEvent({ resource, batchId, socket }))
         })
     }
 

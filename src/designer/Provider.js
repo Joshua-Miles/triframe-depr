@@ -1,11 +1,11 @@
-import socketIo from 'socket.io-client';
+// import socketIo from 'socket.io-client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { withRouter } from 'react-router'
 import { Pipe, EventEmitter, each } from '../core';
 import { Router } from './Router'
 import { Provider as PaperProvider, Snackbar, Portal, DefaultTheme } from 'react-native-paper'
 import { View, Text} from 'react-native'
-import { createUnserializer } from '../arbiter'
+import { createUnserializer, Connection } from '../arbiter'
 import { apiUrl } from './constants'
 
 export const Model = React.createContext({ areReady: false })
@@ -26,20 +26,16 @@ const Main = ({ children, port = 8080, theme = DefaultTheme }) => {
     useEffect(() => {
         (async function () {
             const url = apiUrl(port)
-            await fetch(`${url}/init`, { credentials: 'include' }) // <-- necessary to initialize session. This should be removed in a future release
-            let io = socketIo(url)
+            // await fetch(`${url}/init`, { credentials: 'include' }) // <-- necessary to initialize session. This should be removed in a future release
+            let io = Connection.establish(url)
             const unserialize = createUnserializer(io)
-            io.emit('initialize', ({ apiSchema, id }) => {
+            io.on('install', (apiSchema) => {
                 const api = unserialize(apiSchema)
                 saveModels({ ...api, url })
                 if (typeof window !== 'undefined') Object.assign(window, api)
-                io.on('reconnect', () => {
-                    io.emit('connect-id', id)
-                })
             })
             if(typeof window !== 'undefined') window.resetSocket = () => {
-                io.disconnect()
-                io.connect()
+                io.socket.reconnect()
             }
         })()
     }, [])

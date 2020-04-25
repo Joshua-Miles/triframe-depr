@@ -1,6 +1,20 @@
 const path = require('path');
 const nodeExternals = require('webpack-node-externals');
-const externals = [{ 'fs': 'commonjs fs', 'child_process': 'commonjs child_process', 'http': 'commonjs http', 'triframe/core': 'commonjs triframe/core', 'triframe/scribe': 'commonjs triframe/scribe' }, nodeExternals()]
+
+const externals = [
+    nodeExternals(),
+    [
+        'readline', 
+        'fs', 
+        'child_process', 
+        'http', 
+        'triframe/core',
+        'triframe/scribe',
+        'net',
+        'tls'
+    ].reduce( (externals, package) => ({ ...externals, [package]: `commonjs ${package}`}), {})
+]
+
 
 const serverConfig = {
     externals,

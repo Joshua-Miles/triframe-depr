@@ -90,7 +90,7 @@ export const createUnserializer = io => {
             let document;
             let emitDocument = () => emit(document)
 
-            const emitUnserialized = ({value}) => {
+            const emitUnserialized = (value) => {
                 if(value && value.error){                    
                     // TO DO: Remove invalid patches from the resources patches
                     value.invalidPatches
@@ -102,10 +102,7 @@ export const createUnserializer = io => {
             }
 
             const sendRequest = () => {
-                io.emit(name, { uid, patches, args, attributes }, ({ value, hook }) => {
-                    emitUnserialized({value})
-                    if(hook !== undefined) createSubscription(hook)
-                })
+                io.emit(name, { uid, patches, args, attributes }, emitUnserialized)
             }
 
             const createSubscription = (hook) => {

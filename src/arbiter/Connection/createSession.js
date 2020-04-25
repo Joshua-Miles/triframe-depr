@@ -1,25 +1,31 @@
-import { each, EventEmitter} from 'triframe/core'
+import {EventEmitter} from 'triframe/core'
+import { sign, verify } from 'jsonwebtoken'
 
-const eventEmitters = {}
+let encrypt = (payload, secret) => new Promise( resolve => sign(payload, secret, (err, token) => resolve(token)))
+let decrypt = (token, secret) => new Promise( resolve => verify(token, secret, (err, payload) => resolve(payload)))
 
-const eventEmitterFor = id => {
-    if(eventEmitters[id]) return eventEmitters[id]
-    else return eventEmitters[id] = new EventEmitter
+
+const each = (obj, callback) => {
+    for(let i in obj){
+        callback(i, obj[i])
+    }
 }
 
 export const createSession = (model) => {
+
+    const bin = {}
 
     const crawl = (model, namespace) => {
         class Session {
             constructor(attributes = {}, agent = null, pipes = [], callback = () => null){
                 this['[[attributes]]'] = attributes
-                this['[[agent]]'] = agent ? agent : eventEmitterFor(attributes.id)
+                this['[[agent]]'] = agent ? agent : new EventEmitter
                 this['[[callback]]'] = callback
                 this['[[pipes]]'] = pipes
             }
 
-            get id(){
-                return this['[[attributes]]'].id
+            onAllChanges(callback){
+                this['[[agent]]'].on('*', callback)
             }
 
             onChange(callback){
@@ -48,6 +54,22 @@ export const createSession = (model) => {
                 return this['[[attributes]]']
             }
 
+            static loadFor(connection){
+                const { clientSecret } = connection;
+                return new Promise( resolve => {
+                    connection.emit('__load_session__', null, async (sessionToken) => {
+                        let sessionData = sessionToken ?  await decrypt(sessionToken, clientSecret) : {}
+                        let session = bin[clientSecret] ? bin[clientSecret] : new Session(sessionData)
+                        bin[clientSecret] = session
+                        session.onAllChanges(async () => {
+                            let sessionToken = await encrypt(session.data, clientSecret)
+                            connection.emit('__save_session__', sessionToken)
+                        })
+                        resolve(session)
+                    })
+                })
+            }
+
         }
         each(model, (key, value) => {
             if(typeof value === 'object' && value !== null){
@@ -67,7 +89,7 @@ export const createSession = (model) => {
                         else 
                             this['[[pipes]]'].push(newPipe)
                        
-                        return this['[[attributes]]'][key]
+                        return this['[[attributes]]'][key] || model[key]
                     },
                     set(value){
                         this['[[attributes]]'][key] = value
