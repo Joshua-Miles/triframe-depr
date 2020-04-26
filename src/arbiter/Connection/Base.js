@@ -33,22 +33,26 @@ export class ConnectionBase extends EventEmitter {
     }
 
     handleMessage = ({ data }) => {
-        this.timeLastReceived = Date.now()
-        const [event, payload, id, ...receipts] = JSON.parse(data)
-        const nextMessageId = this.inboxId + 1
-        const respond = this.createRespond(id)
-        receipts.forEach(this.removeFromOutbox)
-        if (parseInt(id) === nextMessageId) {
-            this.receipts.push(id)
-            this.inboxId = id;
-            super.emit(event, payload, respond)
-            this.resolveInbox()
-        } else if (id !== undefined && id !== null) {
-            this.receipts.push(id)
-            this.saveToInbox(id, event, payload)
-            this.requestMessage(nextMessageId)
-        } else {
-            super.emit(event, payload, respond)
+        try {
+            const [event, payload, id, ...receipts] = JSON.parse(data)
+            this.timeLastReceived = Date.now()
+            const nextMessageId = this.inboxId + 1
+            const respond = this.createRespond(id)
+            receipts.forEach(this.removeFromOutbox)
+            if (parseInt(id) === nextMessageId) {
+                this.receipts.push(id)
+                this.inboxId = id;
+                super.emit(event, payload, respond)
+                this.resolveInbox()
+            } else if (id !== undefined && id !== null) {
+                this.receipts.push(id)
+                this.saveToInbox(id, event, payload)
+                this.requestMessage(nextMessageId)
+            } else {
+                super.emit(event, payload, respond)
+            }
+        } catch {
+            console.log('Un-parsed message:', data)
         }
     }
 
