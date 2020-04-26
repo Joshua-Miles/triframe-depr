@@ -17,6 +17,7 @@ fs.readdirSync('node_modules')
         'fs', 
         'child_process', 
         'http', 
+        'https',
         'triframe/core',
         'triframe/scribe',
         'triframe/arbiter',
@@ -28,7 +29,11 @@ fs.readdirSync('node_modules')
         'zlib',
         'stream',
         'events',
-
+        'buffer',
+        'path',
+        'bufferutil',
+        'utf-8-validate',
+        'url'
     ].reduce( (externals, package) => ({ ...externals, [package]: `commonjs ${package}`}), {})
 ]
 
@@ -37,7 +42,8 @@ const serverConfig = {
     externals,
     node: {
         process: false,
-        __dirname: false
+        __dirname: false,
+        Buffer: false
     },
     module: {
         rules: [
