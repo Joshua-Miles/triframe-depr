@@ -1,8 +1,17 @@
 const path = require('path');
-const nodeExternals = require('webpack-node-externals');
+const fs = require('fs');
+const nodeModules = {};
 
-const externals = [
-    nodeExternals(),
+fs.readdirSync('node_modules')
+  .filter(function(x) {
+    return ['.bin'].indexOf(x) === -1;
+  })
+  .forEach(function(mod) {
+    nodeModules[mod] = 'commonjs ' + mod;
+  });
+
+  const externals = [
+    nodeModules,
     [
         'readline', 
         'fs', 
@@ -10,13 +19,16 @@ const externals = [
         'http', 
         'triframe/core',
         'triframe/scribe',
+        'triframe/arbiter',
+        'triframe/designer',
+        'triframe/mason',
         'net',
         'tls'
     ].reduce( (externals, package) => ({ ...externals, [package]: `commonjs ${package}`}), {})
 ]
 
-
 const serverConfig = {
+    mode: 'development',
     externals,
     node: {
         process: false,
