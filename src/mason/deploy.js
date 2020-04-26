@@ -113,7 +113,7 @@ const sendRequest = ({ method, url, body, headers }) => {
     const delimeter = url.includes('?') ? '&' : '?'
     return fetch(`${url}${delimeter}access_token=${gccOAuthToken}`, {
         method,
-        body: JSON.stringify(body),
+        body: ['POST', 'PATCH', 'PUT'].includes(method) ? JSON.stringify(body) : undefined,
         headers: { ...headers, 'Content-Type': 'application/json', 'Accept': 'application/json' }
     }).then(async response => {
         return response.json()
@@ -161,7 +161,7 @@ const del = (url, body = {}, headers = {}) => {
 }
 
 const openRepository = async () => {
-    const repository = await Repository.open(Path.resolve(__dirname, "../.git"))
+    const repository = await Repository.open(Path.resolve(process.cwd(), "./.git"))
     const statuses = await repository.getStatus()
     const everythingIsCommited = statuses.length === 0
 

@@ -25,7 +25,7 @@ export class Connection extends ConnectionBase {
         this.clientSecret = ws.clientSecret
         ws.addEventListener('close', () => {
             clearInterval(this.clearReceiptsTimer)
-            unstore(id)
+            //unstore(id)
         })
     }
 
