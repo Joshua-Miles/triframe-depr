@@ -23,7 +23,8 @@ fs.readdirSync('node_modules')
         'triframe/designer',
         'triframe/mason',
         'net',
-        'tls'
+        'tls',
+        'crypto'
     ].reduce( (externals, package) => ({ ...externals, [package]: `commonjs ${package}`}), {})
 ]
 
