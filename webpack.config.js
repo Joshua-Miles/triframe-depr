@@ -24,7 +24,11 @@ fs.readdirSync('node_modules')
         'triframe/mason',
         'net',
         'tls',
-        'crypto'
+        'crypto',
+        'zlib',
+        'stream',
+        'events',
+
     ].reduce( (externals, package) => ({ ...externals, [package]: `commonjs ${package}`}), {})
 ]
 
