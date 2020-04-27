@@ -62,6 +62,7 @@ export default function WebSocketClient(url, protocols, userOptions) {
     }
 
     self.send = function() {
+      if(realWs.readyState != 1) return
       return realWs.send.apply(realWs, arguments)
     }
 
