@@ -1,5 +1,4 @@
 import { serialize } from './serialize'
-import { createSession } from './createSession'
 import { deepMerge, EventEmitter } from 'triframe/core'
 import { connect } from 'triframe/scribe'
 import { Connection } from './Connection'
@@ -30,21 +29,13 @@ const formidable = require('formidable')
 // }, 5000)
 
 const STORAGE_PATH = './.storage';
-const SESSIONS_PATH = `${STORAGE_PATH}/sessions`;
 const UPLOADS_PATH = `${STORAGE_PATH}/uploads`
 
-
-if (!fs.existsSync(SESSIONS_PATH)) {
-    fs.mkdirSync(SESSIONS_PATH);
-}
 
 if (!fs.existsSync(UPLOADS_PATH)) {
     fs.mkdirSync(UPLOADS_PATH);
 }
 
-const session = require('express-session');
-const FileStore = require('session-file-store')(session);
-const fileStore = new FileStore({ path: SESSIONS_PATH });
 const cors = (config) => expressCors(deepMerge({
     origin: function (origin, resolve) {
         if (!config.useWhiteList || config.clientWhitelist.includes(origin)) {
@@ -74,12 +65,6 @@ const defaultConfig = {
         database: process.env.DB_NAME || 'Josephine',
         port: process.env.DB_PORT || 5432
     },
-    sessionStorage: {
-        secret: process.env.SESSION_SECRET || 'keyboard cat',
-        store: fileStore,
-        resave: true,
-        saveUninitialized: true
-    },
     cors: {
         useWhiteList: process.env.USE_CORS_WHITE_LIST || true,
         clientWhitelist: process.env.CORS_WHITE_LIST || []
@@ -96,13 +81,11 @@ export async function serve(configArgument) {
 
     const corsMiddleware = cors(config.cors)
     const bodyParserMiddleware = bodyParser()
-    const sessionMiddleware = session(config.sessionStorage)
 
     const apiSchema = serialize(models)
     const socketHandler = createSocketHandler(apiSchema)
 
     app.use(httpRedirectMiddleware)
-    app.use(sessionMiddleware);
     app.use(bodyParserMiddleware)
     app.use(corsMiddleware)
     app.use(express.static(path.resolve('./public')))

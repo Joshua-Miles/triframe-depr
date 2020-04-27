@@ -60,7 +60,7 @@ export class ConnectionBase extends EventEmitter {
         this.socket.send(JSON.stringify(["__request_message__", id]))
     }
 
-    resendMessage(id) {
+    resendMessage = (id) => {
         let message = this.outbox[id]
         this.socket.send(message)
     }

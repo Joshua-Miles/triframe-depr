@@ -562,16 +562,6 @@ const diskStartUpScript = `
 `
 
 const createStartupScript = (tarball_url, gcBucketName) => `
-sleep 60
-cd home/isaacsmiles
-apt-get update
-apt-get install authbind
-chmod 500 /etc/authbind/byport/80
-touch /etc/authbind/byport/80
-chown isaacsmiles /etc/authbind/byport/80
-touch /etc/authbind/byport/443
-chmod 500 /etc/authbind/byport/443
-chown isaacsmiles /etc/authbind/byport/443
 wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
 chmod +x cloud_sql_proxy
 ./cloud_sql_proxy -instances=spiral-app:us-central1:spiral-db=tcp:5432 &
@@ -581,8 +571,15 @@ mkdir ./.storage
 export GCSFUSE_REPO=gcsfuse-\`lsb_release -c -s\`
 echo "deb http://packages.cloud.google.com/apt $GCSFUSE_REPO main" | sudo tee /etc/apt/sources.list.d/gcsfuse.list
 curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
-sudo apt-get update
-sudo apt-get install gcsfuse
+while [ 1 == 1 ]
+do
+    echo "What"
+    sudo apt-get update
+    sudo apt-get install gcsfuse
+    if dpkg-query -W -f='\${Status}' gcsfuse | grep "ok installed"; then
+        break 1
+    fi
+done
 gcsfuse ${gcBucketName} ./.storage
 npm install --only=production
 export DB_HOST="127.0.0.1"
