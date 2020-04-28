@@ -13,14 +13,13 @@ export class ConnectionBase extends EventEmitter {
         this.outbox = {}
         this.inbox = {}
         this.receipts = []
-
+        this.on('__request_message__', this.resendMessage)
         this.clearReceiptsTimer = setInterval(this.clearReceipts, 10000)
     }
 
     bind(socket) {
         this.socket = socket
         socket.addEventListener('message', this.handleMessage)
-        this.on('__request_message__', this.resendMessage)
     }
 
     emit(event, payload, callback) {
