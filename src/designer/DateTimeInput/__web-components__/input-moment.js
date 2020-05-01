@@ -19,9 +19,20 @@ export default class InputMoment extends Component {
 
   state = {
     moment:  DateTime.fromJSDate(this.props.value) ,
+    cachedValue: this.props.value,
     tab: 0,
     isActive: false
   };
+
+
+  componentDidUpdate(){
+    if(this.state.cachedValue != this.props.value){
+      this.setState({
+        cachedValue: this.props.value,
+        moment: DateTime.fromJSDate(this.props.value)
+      })
+    }
+  }
 
   handleClickTab = (e, tab) => {
     e.preventDefault();
