@@ -9,28 +9,19 @@ import ncp from 'ncp'
 
 const path = require('path')
 const express = require('express')
-const app = express();
-const server = require('http').Server(app);
-// const io = require('socket.io')(server, { serveClient: false });
+const { Server } = require('http')
+
 const expressCors = require('cors')
 const bodyParser = require('body-parser')
 const formidable = require('formidable')
 
-// const getMemory = () => {
-//     const { heapUsed } = process.memoryUsage()
-//     return heapUsed / 1024 / 1024
-// }
-
-// let initialMemory = getMemory()
-// setInterval(() => {
-//     const memory = getMemory()
-//     console.log('Memory Usage:', `${memory.toFixed(2)} MB`)
-//     console.log('Diff:', `${( initialMemory - memory).toFixed(2)} MB`)
-// }, 5000)
-
 const STORAGE_PATH = './.storage';
 const UPLOADS_PATH = `${STORAGE_PATH}/uploads`
 
+
+if (!fs.existsSync(STORAGE_PATH)) {
+    fs.mkdirSync(STORAGE_PATH);
+}
 
 if (!fs.existsSync(UPLOADS_PATH)) {
     fs.mkdirSync(UPLOADS_PATH);
@@ -55,6 +46,7 @@ const httpRedirectMiddleware = (req, res, next) => {
     }
 }
 
+
 const defaultConfig = {
     port: process.env.BACKEND_PORT || 8080,
     models: {},
@@ -71,105 +63,97 @@ const defaultConfig = {
     }
 }
 
-export async function serve(configArgument) {
+class Api extends EventEmitter{
 
-    let config = deepMerge(defaultConfig, configArgument)
+    constructor(configOptions){
+        super()
+        let config = deepMerge(defaultConfig, configOptions)
+        let router = express()
+        this.config = config
+        this.router = router
+        this.server = Server(router);
+        this.models = typeof config.models == 'function' ? loadModels(config.models) : config.models
+        this.schema = serialize(this.models)
+        this.boot()
+    }
 
-    const models = typeof config.models == 'function' ? loadModels(config.models) : config.models
-
-    await connect(config.database)
-
-    const corsMiddleware = cors(config.cors)
-    const bodyParserMiddleware = bodyParser()
-
-    const apiSchema = serialize(models)
-    const socketHandler = createSocketHandler(apiSchema)
-
-    app.use(httpRedirectMiddleware)
-    app.use(bodyParserMiddleware)
-    app.use(corsMiddleware)
-    app.use(express.static(path.resolve('./public')))
-    app.get('/init', (req, res) => res.json({ ok: true }))
-    app.post('/upload', cdnUploadHandler)
-    app.get('/cdn*', cdnHandler)
-    app.get('/*', frontendHandler)
-
-    Connection.listen(server, config.session, socketHandler)
-
-
-    server.listen(config.port)
-    console.log(`Listening on ${config.port}`)
-}
-
-
-// Request Handlers
-
-const frontendHandler = (req, res) => {
-    res.sendFile(path.resolve('./public/index.html'))
-}
-
-const cdnHandler = (req, res) => {
-    const path = req.url.replace('/cdn', `${UPLOADS_PATH}/`)
-    const extension = path.split('.').pop()
-    const stat = fs.statSync(path);
-    const mimeType = mime.getType(extension);
-    res.writeHead(200, {
-        'Content-Type': mimeType,
-        'Content-Length': stat.size
-    });
-    const readStream = fs.createReadStream(path);
-    readStream.pipe(res);
-}
-
-const cdnUploadHandler = (req, res) => {
-    const form = new formidable.IncomingForm();
-    const urls = []
-    form.parse(req, (err, fields, files) => {
-        Object.values(files).forEach(file => {
-            const extension = file.name.split('.').pop()
-            const filepath = `${createToken()}.${extension}`
-            urls.push(`/cdn/${filepath}`)
-            ncp(file.path, `${UPLOADS_PATH}/${filepath}`);
+    async boot(){
+        const { config, server } = this;
+        await connect(config.database)
+        server.listen(config.port, () => {
+            this.drawRoutes() // <-- Draw routes after connection, allowing user defined routes to 
+                              //       supercede the frontendHandler
+            console.log(`Listening on ${config.port}`)
         })
-        // res.writeHead(200, { 'content-type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
-        res.end(JSON.stringify(urls));
-    });
+    }
+
+    drawRoutes(){
+        const { config, router, server, cdnUploadHandler, cdnHandler, frontendHandler, socketHandler } = this;
+
+        const corsMiddleware = cors(config.cors)
+        const bodyParserMiddleware = bodyParser()
+    
+        router.use(httpRedirectMiddleware)
+        router.use(bodyParserMiddleware)
+        router.use(corsMiddleware)
+        router.use(express.static(path.resolve('./public')))
+        router.post('/upload', cdnUploadHandler)
+        router.get('/cdn*', cdnHandler)
+        router.get('/*', frontendHandler)
+    
+        Connection.listen(server, config.session, socketHandler)
+    }
+
+    frontendHandler = (req, res) => {
+        res.sendFile(path.resolve('./public/index.html'))
+    }
+    
+    cdnHandler = (req, res) => {
+        const path = req.url.replace('/cdn', `${UPLOADS_PATH}/`)
+        const extension = path.split('.').pop()
+        const stat = fs.statSync(path);
+        const mimeType = mime.getType(extension);
+        res.writeHead(200, {
+            'Content-Type': mimeType,
+            'Content-Length': stat.size
+        });
+        const readStream = fs.createReadStream(path);
+        readStream.pipe(res);
+    }
+    
+    cdnUploadHandler = (req, res) => {
+        const form = new formidable.IncomingForm();
+        const urls = []
+        form.parse(req, (err, fields, files) => {
+            Object.values(files).forEach(file => {
+                const extension = file.name.split('.').pop()
+                const filepath = `${createToken()}.${extension}`
+                urls.push(`/cdn/${filepath}`)
+                ncp(file.path, `${UPLOADS_PATH}/${filepath}`);
+            })
+            // res.writeHead(200, { 'content-type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
+            res.end(JSON.stringify(urls));
+        });
+    }
+    
+    socketHandler = socket => {
+        const { schema } =  this
+
+        socket.on('*', (payload, send, event) => {
+            schema.emit(event, { ...payload, socket, send,  /*onClose*/ })
+        })
+
+        this.emit('connection', socket)
+    
+        socket.emit('install', schema)
+    }
+
+
 }
 
-const createSocketHandler = (apiSchema) => socket => {
 
-    socket.on('*', (payload, send, event) => {
-        apiSchema.emit(event, { ...payload, socket, send,  /*onClose*/ })
-    })
-
-    socket.emit('install', apiSchema)
-
-    // socket.use(([event, payload, respond], next) => {
-    //     if(!connection) return next();
-    //     let { socket } = connection
-    //     let closeHandler = () => null
-    //     let hasResponded = false
-    //     let hook = false;
-    //     let send = (value, keepOpen) => {
-    //         if (!hasResponded) {
-    //             hasResponded = true
-    //             if (keepOpen) {
-    //                 hook = `${connection.requestId++}: ${event}`
-    //                 socket.on(`${hook}.destroy`, () => closeHandler())
-    //                 respond({ value, hook })
-    //             } else {
-    //                 respond({ value })
-    //             }
-    //         } else {
-    //             socket.emit(hook, { value })
-    //         }
-    //     }
-    //     let onClose = callback => closeHandler = callback
-    //     // THIS SHIT:
-    //     apiSchema.emit(event, { ...payload, connection, send, onClose })
-    //     next()
-    // })
-    
+export const serve = configOptions => {
+    return new Api(configOptions)
 }
 
 
