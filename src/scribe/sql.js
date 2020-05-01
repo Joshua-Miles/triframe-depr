@@ -105,7 +105,7 @@ function* queryProcess(emit, options, triQL, escaped, events) {
             let alreadyAdded = {}
             value.forEach( value => {
                 if(value !== null && value.id !== null && !alreadyAdded[value.id]){
-                    added[value.id] = true
+                    alreadyAdded[value.id] = true
                     result.push(value)
                 }
             })
