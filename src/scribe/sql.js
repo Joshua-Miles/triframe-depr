@@ -101,7 +101,15 @@ function* queryProcess(emit, options, triQL, escaped, events) {
             return new Model(index(value, camelCasedKeys, decodedValues))
         }
         if (Array.isArray(value)) {
-            return value.filter(value => value !== null && value.id !== null)
+            let result = []
+            let alreadyAdded = {}
+            value.forEach( value => {
+                if(value !== null && value.id !== null && !alreadyAdded[value.id]){
+                    added[value.id] = true
+                    result.push(value)
+                }
+            })
+            return result
         }
         return value
     })
