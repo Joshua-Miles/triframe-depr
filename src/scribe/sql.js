@@ -100,7 +100,7 @@ function* queryProcess(emit, options, triQL, escaped, events) {
             }
             return new Model(index(value, camelCasedKeys, decodedValues))
         }
-        if (Array.isArray(value)) {
+        if (Array.isArray(value) && value.every( element => typeof element === 'object')) {
             let result = []
             let alreadyAdded = {}
             value.forEach( value => {
