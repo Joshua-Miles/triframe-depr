@@ -148,7 +148,7 @@ let ConnectedComponent = withRouter(({ props = [], models, Component, history, m
             dispatch({ jsx, runAfterRender, pipe })
         })
 
-        pipe.catch(err => console.log(Component.name, err))
+        pipe.catch(err => { throw err })
         return () => pipe && pipe.destroy()
 
     }, [models.areReady])

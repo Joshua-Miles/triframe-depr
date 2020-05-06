@@ -34,8 +34,43 @@ export class List extends Array {
         super.push(...elements)
     }
 
+    _splice(...args){
+        return super.splice(...args)
+    }
+
+    splice(index, deleted, ...elements) {
+        super.splice(index, deleted, ...elements)
+        
+        let origin = Math.min(deleted + index, elements.length + index)
+    
+        let replacementPatches = []
+        for(let i = index; i < origin; i++) replacementPatches.push({
+            op: 'replace',
+            path: `/${i}`,
+            value: elements[i - index]
+        })
+
+        let removedPatches = []
+        for(let i = origin; i < index + deleted; i++) removedPatches.push({
+            op: 'remove',
+            path: `/${i}`,
+        })
+
+        let additionPatches = []
+        for(let i = origin; i < index + elements.length; i++) removedPatches.push({
+            op: 'add',
+            path: `/${i}`,
+            value: elements[i - index]
+        })
+
+        let patches = [ ...replacementPatches, ...removedPatches, ...additionPatches ]
+
+        this["[[patches]]"].push(...patches)
+        this.emit('Δ.change', patches)
+    }
+
     insert(element, index) {
-        this.splice(index, 0, element)
+        super.splice(index, 0, element)
         let patch = {
             op: 'add',
             path: `/${index}`,
@@ -79,7 +114,7 @@ export class List extends Array {
 
     remove(start, end = null) {
         if (end == null) end = start
-        this.splice(start, 1 + end - start)
+        super.splice(start, 1 + end - start)
         let patches = []
         for (let index = start; index <= end; index++) {
             patches.push({
@@ -87,6 +122,7 @@ export class List extends Array {
                 path: `/${start}`
             })
         }
+        console.log(patches)
         this["[[patches]]"].push(...patches)
         this.emit('Δ.change', patches)
     }

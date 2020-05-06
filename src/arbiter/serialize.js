@@ -130,9 +130,12 @@ export const serialize = function ($interface, config= {}) {
                     try {
                         result = value.apply(resource, args)
                     } catch (err) {
-                        send({ error: true, message: err.message })
+                        send({ error: true, message: err.message, callstack: Error.captureStackTrace(err) })
                     }
-                    if (result && result.catch) result.catch(err => send({ error: true, message: err.message }))
+                    if (result && result.catch) result.catch(err => {
+                        Error.captureStackTrace(err)
+                        send({ error: true, message: err.message, callstack: err.stack })
+                    })
                     if (isPipe(result)) {
                         result.observe(value => sendSerialized(value, true))
                         // onClose(() => {

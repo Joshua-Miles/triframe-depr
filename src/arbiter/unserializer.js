@@ -91,7 +91,8 @@ export const createUnserializer = io => {
             let emitDocument = () => emit(document)
 
             const emitUnserialized = (value) => {
-                if(value && value.error){                    
+                if(value && value.error){      
+                    console.log(value)              
                     // TO DO: Remove invalid patches from the resources patches
                     value.invalidPatches
 

@@ -1,12 +1,35 @@
 import React, { useState } from 'react';
-import { Button as Pressable, FAB, ToggleButton, withTheme } from 'react-native-paper'
+import { Button as Pressable, FAB, ToggleButton, withTheme, ActivityIndicator } from 'react-native-paper'
 import { View } from 'react-native'
 
-const Button = withTheme(({ children, mode = "contained", theme, color, ...rest }) => (
-    // <View style={{ flexDirection: 'row' }}>
-        <Pressable style={{ padding: 5, margin: 5 }} mode={mode} color={theme.colors[color] || color } {...rest}>{children}</Pressable>
-    // </View>
-))
+const Button = withTheme(({ children, mode = "contained", disabled = false, disableWhileProcessing= true, processingMessage= null, icon, onPress, theme, color, ...rest }) => {
+    let handlePress;
+    let [ processing, setProcessing ] = useState(false)
+    if(typeof onPress === 'function') handlePress = function(e){
+        let process = onPress(e)
+        if(disableWhileProcessing && process && typeof process.then == 'function'){ 
+            setProcessing(true)
+            process.then(() => {
+                setProcessing(false)
+            })
+        }
+    }
+    return (
+        <Pressable 
+            style={{ padding: 5, margin: 5 }} 
+            disabled={disabled || processing}
+            mode={mode} color={theme.colors[color] || color } 
+            icon={ processing ? props => <ActivityIndicator animating={true}  {...props} /> : icon}
+            onPress={handlePress}
+            {...rest}
+        >
+            { processing 
+                ? processingMessage || children
+                : children
+            }
+        </Pressable>
+    )
+})
 
 const BubbleButton = (props) => (
     <FAB

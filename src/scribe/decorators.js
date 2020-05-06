@@ -1,5 +1,7 @@
-import { saveMetadata, getMetadata, toForeignKeyName, each, metadata, index, Pipe, toCamelCase } from 'triframe/core'
+import { saveMetadata, getMetadata, toForeignKeyName, each, metadata, index, toCamelCase } from 'triframe/core'
 import { Resource } from 'triframe/arbiter'
+const { Pipe } = require('triframe/core')
+
 
 //  ---------------------- DATATYPES ----------------------
 

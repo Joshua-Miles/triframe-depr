@@ -5,8 +5,6 @@ import { View, TouchableOpacity, Platform, ScrollView, Animated, PanResponder, M
 // // Native Paper Components
 import { Provider as StyleProvider, Appbar, Avatar, Menu, Divider, Badge, RadioButton, Snackbar, Portal, ProgressBar, Checkbox, DefaultTheme } from 'react-native-paper';
 
-
-
 // // Custom Components
 import TextEditor from './TextEditor'
 import Drawer from './Drawer'

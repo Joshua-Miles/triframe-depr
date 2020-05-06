@@ -73,6 +73,7 @@ const serverConfig = {
 }
 
 const clientConfig = {
+    // mode: 'development',
     externals: [...externals, {
         'react': 'commonjs react',
         'react-native': 'commonjs react-native',

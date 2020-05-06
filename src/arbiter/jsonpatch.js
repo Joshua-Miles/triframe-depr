@@ -365,11 +365,16 @@ var objOps = {
         return { newDocument: document };
     }
 };
+
+function callSplice(target, ...args){
+    return typeof target._splice === 'function' ? target._splice(...args) : target.splice(...args) 
+}
+
 /* The operations applicable to an array. Many are the same as for the object */
 var arrOps = {
     add: function (arr, i, document) {
         if (helpers_1.isInteger(i)) {
-            arr.splice(i, 0, this.value);
+            callSplice(arr, i, 0, this.value);
         }
         else {
             arr[i] = this.value;
@@ -378,7 +383,7 @@ var arrOps = {
         return { newDocument: document, index: i };
     },
     remove: function (arr, i, document) {
-        var removedList = arr.splice(i, 1);
+        var removedList = callSplice(arr, i, 1);
         return { newDocument: document, removed: removedList[0] };
     },
     replace: function (arr, i, document) {
@@ -1113,7 +1118,7 @@ export const JSONPatchOT = (function(){
                     (originalOp.from === patchOp.path || originalOp.from.indexOf(patchOp.path + "/") === 0 ) ||
                 ( patchOp.path === originalOp.path || originalOp.path.indexOf(patchOp.path + "/") === 0 ) ){
               debug && console.log("Removing ", originalOp);
-              original.splice(currentOp,1);
+              callSplice(original, currentOp,1);
               orgOpsLen--;
               currentOp--;
             }
@@ -1164,7 +1169,7 @@ export const JSONPatchOT = (function(){
                       (originalOp.from === patchOp.path || originalOp.from.indexOf(patchOp.path + "/") === 0 ) ||
                   ( patchOp.path === originalOp.path || originalOp.path.indexOf(patchOp.path + "/") === 0 ) ){
                 debug && console.log("Removing ", originalOp);
-                original.splice(currentOp,1);
+                callSplice(original, currentOp,1);
                 orgOpsLen--;
                 currentOp--;
               }
@@ -1214,7 +1219,7 @@ export const JSONPatchOT = (function(){
                     (originalOp.from === patchOp.path || originalOp.from.indexOf(patchOp.path + "/") === 0 ) ||
                 originalOp.path.indexOf(patchOp.path + "/") === 0 ){
               debug && console.log("Removing ", originalOp);
-              original.splice(currentOp,1);
+              callSplice(original, currentOp,1);
               currentOp--;
             }
             currentOp++;
