@@ -52,7 +52,6 @@ export const initializeResource = (resource, attributes = {}) => {
             if (socket != otherSocket) {
                 try{
                     mergePatches(resource, patches)
-                    console.log('emitting', `${resource.uid}.mergePatches`)
                     otherSocket.emit(`${resource.uid}.mergePatches`, patches)
                 } catch(err){
                     // ?

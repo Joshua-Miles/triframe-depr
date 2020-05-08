@@ -133,7 +133,7 @@ export const serialize = function ($interface, config= {}) {
                         send({ error: true, message: err.message, callstack: Error.captureStackTrace(err) })
                     }
                     if (result && result.catch) result.catch(err => {
-                        Error.captureStackTrace(err)
+                        // Error.captureStackTrace(err)
                         send({ error: true, message: err.message, callstack: err.stack })
                     })
                     if (isPipe(result)) {

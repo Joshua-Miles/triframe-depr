@@ -122,7 +122,6 @@ export class List extends Array {
                 path: `/${start}`
             })
         }
-        console.log(patches)
         this["[[patches]]"].push(...patches)
         this.emit('Δ.change', patches)
     }
