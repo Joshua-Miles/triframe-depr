@@ -3,6 +3,7 @@ import { TextInput as TextField, View, TouchableOpacity, Text } from 'react-nati
 import { TextInput as RNPTextInput, HelperText, Switch, Subheading } from 'react-native-paper'
 import { Area } from './Layout'
 import { FileInput } from './FileInput'
+import { DateInput } from './DateInput'
 import { DateTimeInput } from './DateTimeInput'
 import { TextArea } from './TextArea'
 
@@ -27,4 +28,4 @@ const ToggleSwitch = ({ onPress, ...props }) => (
   <Switch onValueChange={onPress} {...props} />
 )
 
-export { TextField, TextInput, PasswordInput, ToggleInput, FileInput, DateTimeInput, HelperText, ToggleSwitch, TextArea }
+export { TextField, TextInput, PasswordInput, ToggleInput, FileInput, DateTimeInput, DateInput, HelperText, ToggleSwitch, TextArea }

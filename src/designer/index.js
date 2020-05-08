@@ -13,7 +13,7 @@ import { Card, Chip, List, Surface } from './Material'
 import { createGrid, Container, Section, Area } from './Layout'
 import { Button, BubbleButton, ToggleButton } from './Button'
 import { Text, Title, Heading, Subheading, Paragraph, Caption } from './Typography'
-import { TextInput, PasswordInput, TextField, HelperText, ToggleSwitch, FileInput, ToggleInput, DateTimeInput, TextArea } from './Form'
+import { TextInput, PasswordInput, DateInput, TextField, HelperText, ToggleSwitch, FileInput, ToggleInput, DateTimeInput, TextArea } from './Form'
 import * as Constants from './constants'
 import { Route, Redirect, Switch } from 'react-router';
 import { Provider, tether } from './Provider';
@@ -81,7 +81,7 @@ export {
     Button, BubbleButton, ToggleButton,
 
     // Form
-    TextInput, PasswordInput, TextField, HelperText, ToggleSwitch, RadioButton, FileInput, ToggleInput, DateTimeInput, TextArea,
+    TextInput, PasswordInput, FileInput, ToggleInput, DateInput, DateTimeInput, TextArea, TextField, HelperText, ToggleSwitch, RadioButton,
 
     // Material
     Chip, Card, List,
