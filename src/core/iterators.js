@@ -187,8 +187,8 @@ function deepMerge(obj1, obj2) {
             if(!obj1) return obj1 || obj2
 
             if(obj1['[[attributes]]']){
-                obj1['attributes'] = deepMerge(obj1['[[attributes]]'], obj2['[[attributes]]'])
-                obj1['base'] = deepMerge(obj1['[[base]]'], obj2['[[base]]'])
+                obj1['[[attributes]]'] = deepMerge(obj1['[[attributes]]'], obj2['[[attributes]]'])
+                obj1['[[base]]'] = deepMerge(obj1['[[base]]'], obj2['[[base]]'])
                 return obj1
             }
 

@@ -145,26 +145,34 @@ function _deepClone(obj) {
 }
 
 
-function deepMerge(obj1, obj2) {
+function deepMerge(obj1, obj2, cache = { targets: [], results: [] }) {
+    let cacheIndex = cache.targets.indexOf(obj2)
+    if(cacheIndex > -1) return cache.results[cacheIndex]
+    cacheIndex = cache.targets.length
+    cache.targets.push(obj2)
+    let resolve = result => {
+        cache.results[cacheIndex] = result
+        return result
+    }
     switch (typeof obj2) {
         case "object":
-            if(!obj1) return obj1 || obj2
+            if(!obj1) return resolve(obj1 || obj2)
 
             if(obj1['[[attributes]]']){
-                obj1['attributes'] = deepMerge(obj1['[[attributes]]'], obj2['[[attributes]]'])
-                obj1['base'] = deepMerge(obj1['[[base]]'], obj2['[[base]]'])
-                return obj1
+                obj1['[[attributes]]'] = deepMerge(obj1['[[attributes]]'], obj2['[[attributes]]'], cache)
+                obj1['[[base]]'] = deepMerge(obj1['[[base]]'], obj2['[[base]]'], cache)
+                return resolve(obj1)
             }
 
             if(Array.isArray(obj2)){
-                return obj2.map( (obj2, i) => obj1[i] && obj1[i].uid == obj2.uid ? deepMerge( obj1[i], obj2) : obj2)
+                return resolve(obj2.map( (obj2, i) => obj1[i] && obj1[i].uid == obj2.uid ? deepMerge( obj1[i], obj2, cache) : obj2))
             }
 
-            return { ...obj1, ...map(obj2, (k, obj2) => deepMerge(obj1[k], obj2)) }
+            return resolve({ ...obj1, ...map(obj2, (k, obj2) => deepMerge(obj1[k], obj2, cache)) })
         case "undefined":
-            return null; //this is how JSON.stringify behaves for array items
+            return resolve(null); //this is how JSON.stringify behaves for array items
         default:
-            return obj2; //no need to clone primitives
+            return resolve(obj2); //no need to clone primitives
     }
 }
 

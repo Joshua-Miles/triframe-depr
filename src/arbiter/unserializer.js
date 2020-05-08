@@ -216,7 +216,6 @@ const createCache = ({ socket }) => {
         } else {
             if(!bin[resource.uid].callbacks.includes(callback)) bin[resource.uid].callbacks.push(callback);
             upstreamMerge(bin[resource.uid].resource, resource);
-
             resource = bin[resource.uid].resource
         }
 
