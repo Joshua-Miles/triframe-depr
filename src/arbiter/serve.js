@@ -29,7 +29,7 @@ if (!fs.existsSync(UPLOADS_PATH)) {
 
 const cors = (config) => expressCors(deepMerge({
     origin: function (origin, resolve) {
-        if (!config.useWhiteList || config.clientWhitelist.includes(origin)) {
+        if (origin.includes('localhost') || !config.useWhiteList || config.clientWhitelist.includes(origin)) {
             resolve(null, origin)
         } else {
             resolve(null, '')
