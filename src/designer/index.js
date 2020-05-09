@@ -1,5 +1,5 @@
 // Native and Platform Components
-import { View, TouchableOpacity, Platform, ScrollView, Animated, PanResponder, Modal as LegacyModal } from 'react-native'
+import { View, TouchableOpacity, Platform, ScrollView, Animated, PanResponder, Modal as LegacyModal, Image } from 'react-native'
 
 
 // // Native Paper Components
@@ -60,7 +60,7 @@ export {
 
     // Icon,
 
-    TouchableOpacity, ScrollView, Animated, PanResponder, LegacyModal,
+    TouchableOpacity, ScrollView, Animated, PanResponder, LegacyModal, Image,
 
     // Deprecate
     TextEditor,

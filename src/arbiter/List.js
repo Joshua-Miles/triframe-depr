@@ -1,4 +1,4 @@
-import { EventEmitter } from "triframe/core"
+import { EventEmitter, each } from "triframe/core"
 
 export class List extends Array {
 
@@ -29,6 +29,7 @@ export class List extends Array {
             path: `/${length++}`,
             value: element
         }))
+        createObservable(elements).observe( () => this.emit('Δ.change', []))
         this["[[patches]]"].push(...patches)
         this.emit('Δ.change', patches)
         super.push(...elements)
@@ -124,5 +125,35 @@ export class List extends Array {
         }
         this["[[patches]]"].push(...patches)
         this.emit('Δ.change', patches)
+    }
+}
+
+let createObservable = resource => {
+    const agent = new EventEmitter;
+    const monitor = node => {
+        if(typeof node.on === 'function') node.on('Δ.change', () => agent.emit(`change`) )
+        else each(node, (key, value) => {
+            Object.defineProperty(node, key, {
+                    enumerable: true,
+                    get: () => value,
+                    set: newValue => {
+                        value = newValue
+                        agent.emit(`change`)
+                    }
+                })
+        })
+    }
+    crawl(resource, monitor)
+    return agent.on('change')
+}
+const primativeTypes = ['String', 'Boolean', 'Number', 'Date', 'Function']
+const isPlain = value => value && typeof value === 'object' && !primativeTypes.includes(value.constructor.name)
+const crawl = (obj, callback) => {
+    if (isPlain(obj)) {
+        callback(obj)
+        for (let key in obj) {
+            let value = obj[key]
+            crawl(value, callback)
+        }
     }
 }
