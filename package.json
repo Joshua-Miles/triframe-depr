@@ -34,7 +34,7 @@
     "commander": "^4.1.1",
     "expo-constants": "^8.0.0",
     "expo-image-picker": "^8.0.2",
-    "node-fetch": "^2.6.0",
+    "node-fetch": "^2.6.7",
     "nodegit": "^0.26.5",
     "opn": "^6.0.0",
     "react-input-slider": "^5.1.4",
