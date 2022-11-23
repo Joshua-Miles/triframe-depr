@@ -24,7 +24,7 @@
     "react-error-overlay": "^6.0.7",
     "regenerator-runtime": "^0.13.5",
     "session-file-store": "^1.4.0",
-    "socket.io": "^2.3.0",
+    "socket.io": "^2.5.0",
     "socket.io-client": "^2.3.0",
     "utf-8-validate": "^5.0.2"
   },
